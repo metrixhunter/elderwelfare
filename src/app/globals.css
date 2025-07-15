@@ -1,26 +1,46 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background-light: #f4f6f8; /* Finance-themed light gray */
+  --foreground-light: #004A99; /* Deep blue */
+  
+  --background-dark: #121212;
+  --foreground-dark: #58A6FF; /* Bright finance blue */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* Use Tailwind's dark mode */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background-light: var(--background-dark);
+    --foreground-light: var(--foreground-dark);
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--background-light);
+  color: var(--foreground-light);
+  font-family: 'Inter', Arial, sans-serif;
+}
+
+/* Tailwind-based styling */
+.bg-primary {
+  background-color: var(--background-light);
+}
+
+.text-primary {
+  color: var(--foreground-light);
+}
+
+/* Dark mode classes for Tailwind */
+.dark .bg-primary {
+  background-color: var(--background-dark);
+}
+
+.dark .text-primary {
+  color: var(--foreground-dark);
+}
+
+/* ✅ Completely hides scrollbar */
+::-webkit-scrollbar {
+  display: none;
 }
