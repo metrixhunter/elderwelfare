@@ -1,27 +1,45 @@
 {
-  "name": "eldercare-welfare",
+  "name": "eldcare-welfare",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
+    "export": "next export",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "next": "15.4.1"
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.1.0",
+    "@mui/material": "^7.0.1",
+    "@prisma/client": "^6.9.0",
+    "@types/bcryptjs": "^3.0.0",
+    "@vonage/server-sdk": "^3.21.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "mongoose": "^8.15.0",
+    "mysql2": "^3.14.1",
+    "next": "15.2.4",
+    "next-auth": "^4.24.11",
+    "pg": "^8.16.0",
+    "prisma": "^6.9.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "redis": "^5.5.6",
+    "twilio": "^5.7.0"
   },
   "devDependencies": {
-    "typescript": "^5",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
     "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
-    "eslint": "^9",
-    "eslint-config-next": "15.4.1",
-    "@eslint/eslintrc": "^3"
+    "@types/bun": "latest",
+    "gh-pages": "^6.3.0",
+    "tailwindcss": "^4"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
   }
 }
