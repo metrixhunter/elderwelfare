@@ -9,11 +9,11 @@ import './globals.css';
 
 // Update navigation for elder welfare theme
 const exploreOptions = [
-  { label: "Care Services", href: "/care-services" },
-  { label: "Health & Wellness", href: "/health-wellness" },
-  { label: "Community Support", href: "/community" },
-  { label: "Legal & Financial Help", href: "/legal-financial" },
-  { label: "Resources", href: "/resources" },
+  { label: "Care Services", href: "/budgeting" },
+  { label: "Health & Wellness", href: "/credit" },
+  { label: "Community Support", href: "/saving" },
+  { label: "Legal & Financial Help", href: "/safety" },
+  { label: "Resources", href: "/investment" },
 ];
 
 const getInvolvedOptions = [

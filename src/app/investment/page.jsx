@@ -7,33 +7,34 @@ export default function InvestmentPage() {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "url('/images/finance-investment.webp') center/cover no-repeat, linear-gradient(to bottom, #e8eaf6 70%, #21243d 100%)",
+        background: "url('/images/resources.jpg') center/cover no-repeat, linear-gradient(to bottom, #e3f2fd 70%, #1976d2 100%)",
         position: "relative"
       }}
     >
       <Container maxWidth="md" sx={{ py: 8, display: "flex", flexDirection: "row", alignItems: "flex-end", minHeight: 480 }}>
         <Box sx={{ flex: 1, pb: 6 }}>
           <Paper elevation={3} sx={{ p: 3, borderRadius: 3, background: "#fff8" }}>
-            <Typography variant="h4" gutterBottom>📈 Investment</Typography>
+            <Typography variant="h4" gutterBottom>📚 Resources</Typography>
             <Typography paragraph>
-              <b>What is Investment?</b> Investment is the process of allocating your money into assets (like stocks, bonds, real estate) with the expectation of earning a return or profit.
+              <b>What Resources are Available?</b> Find guides, articles, helplines, and tools to support elders and caregivers. Stay informed and empowered in all aspects of elder welfare.
             </Typography>
-            <Typography><b>Why Invest?</b></Typography>
+            <Typography><b>Resource Highlights:</b></Typography>
             <List>
-              <ListItem><ListItemText primary="Grow your wealth over time" /></ListItem>
-              <ListItem><ListItemText primary="Beat inflation" /></ListItem>
-              <ListItem><ListItemText primary="Achieve financial independence" /></ListItem>
+              <ListItem><ListItemText primary="Guides for health, legal, and financial topics" /></ListItem>
+              <ListItem><ListItemText primary="Helplines and emergency contacts" /></ListItem>
+              <ListItem><ListItemText primary="Caregiver tips and best practices" /></ListItem>
+              <ListItem><ListItemText primary="Latest news and articles for elders" /></ListItem>
             </List>
             <Typography sx={{ mt: 2 }}><b>Example:</b></Typography>
             <Paper sx={{ p: 2, bgcolor: 'grey.50', mt: 1 }}>
               <Typography>
-                Investing ₹10,000 in a mutual fund that grows at 10% per year could be worth more than ₹25,000 in 10 years.
+                Our resource library includes step-by-step guides for healthcare planning and links to trusted helplines for elder support.
               </Typography>
             </Paper>
           </Paper>
         </Box>
         <Box sx={{ flex: 1, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-           <Box sx={{
+          <Box sx={{
             width: 0, height: 0,
             background: "",
             borderRadius: 24,
@@ -42,9 +43,9 @@ export default function InvestmentPage() {
             overflow: "hidden"
           }}>
             <Box sx={{
-              position: "relative",
+              position: "absolute",
               left: 0, bottom: 0, width: "100%", height: "60%",
-              background: "url('/images/finance-investment.webp') center/cover no-repeat, linear-gradient(0deg, #21243d 80%, rgba(33,36,61,0.0) 100%)"
+              background: "url('/images/resources.jpg') center/cover no-repeat, linear-gradient(to bottom, #e3f2fd 70%, #1976d2 100%)"
             }} />
           </Box>
         </Box>

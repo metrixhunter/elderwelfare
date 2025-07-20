@@ -7,7 +7,7 @@ export default function BudgetingPage() {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "url('/images/finance-budgeting.jpg') center/cover no-repeat, linear-gradient(to bottom, #e8eaf6 70%, #21243d 100%)",
+        background: "url('/images/care-services.jpg') center/cover no-repeat, linear-gradient(to bottom, #e8f5e9 70%, #2E7D32 100%)",
         position: "relative",
         boxShadow: '0 6px 36px #0002',
       }}
@@ -15,22 +15,21 @@ export default function BudgetingPage() {
       <Container maxWidth="md" sx={{ py: 8, display: "flex", flexDirection: "row", alignItems: "flex-end", minHeight: 480 }}>
         <Box sx={{ flex: 1, pb: 6 }}>
           <Paper elevation={3} sx={{ p: 3, borderRadius: 3, background: "#fff8" }}>
-            <Typography variant="h4" gutterBottom>💰 Budgeting</Typography>
+            <Typography variant="h4" gutterBottom>🤝 Care Services</Typography>
             <Typography paragraph>
-              <b>What is Budgeting?</b> Budgeting is the process of creating a plan to manage your income and expenses over a specific period of time. 
-              It helps you prioritize spending, track your habits, and save for both short- and long-term goals.
+              <b>What are Care Services?</b> Care services provide essential support for elders, including assistance with daily activities, health monitoring, and companionship. These services help maintain dignity, independence, and quality of life.
             </Typography>
-            <Typography><b>Why Budget?</b></Typography>
+            <Typography><b>Types of Care Services:</b></Typography>
             <List>
-              <ListItem><ListItemText primary="Avoid unnecessary debt and overspending" /></ListItem>
-              <ListItem><ListItemText primary="Build an emergency fund for unexpected expenses" /></ListItem>
-              <ListItem><ListItemText primary="Achieve financial goals efficiently" /></ListItem>
-              <ListItem><ListItemText primary="Gain control and confidence over your finances" /></ListItem>
+              <ListItem><ListItemText primary="Home care and personal assistance" /></ListItem>
+              <ListItem><ListItemText primary="Medical support and nursing" /></ListItem>
+              <ListItem><ListItemText primary="Meal delivery and nutrition" /></ListItem>
+              <ListItem><ListItemText primary="Companionship and social visits" /></ListItem>
             </List>
             <Typography sx={{ mt: 2 }}><b>Example:</b></Typography>
             <Paper sx={{ p: 2, bgcolor: 'grey.50', mt: 1 }}>
               <Typography>
-                Suppose your monthly income is ₹30,000 and your monthly expenses are ₹22,000. If you budget, you can set aside the remaining ₹8,000 for savings or investment, and plan for emergenc[...]
+                Mrs. Sharma receives daily home care visits for help with medication and meals, ensuring she stays healthy and connected to her community.
               </Typography>
             </Paper>
           </Paper>
@@ -47,7 +46,7 @@ export default function BudgetingPage() {
             <Box sx={{
               position: "absolute",
               left: 0, bottom: 0, width: "100%", height: "60%",
-              background: "url('/images/finance-budgeting.jpg') center/cover no-repeat, linear-gradient(to bottom, #e8eaf6 70%, #21243d 100%)",
+              background: "url('/images/care-services.jpg') center/cover no-repeat, linear-gradient(to bottom, #e8f5e9 70%, #2E7D32 100%)",
               boxShadow: '0 6px 36px #0002',
             }} />
           </Box>
