@@ -7,85 +7,77 @@ import { Container, Typography, Button, Box, Paper, Popover, Grid, List, ListIte
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import './globals.css';
 
+// Update navigation for elder welfare theme
 const exploreOptions = [
-  { label: "Budgeting", href: "/budgeting" },
-  { label: "Credit", href: "/credit" },
-  { label: "Saving", href: "/saving" },
-  { label: "Safety", href: "/safety" },
-  { label: "Investment", href: "/investment" },
+  { label: "Care Services", href: "/care-services" },
+  { label: "Health & Wellness", href: "/health-wellness" },
+  { label: "Community Support", href: "/community" },
+  { label: "Legal & Financial Help", href: "/legal-financial" },
+  { label: "Resources", href: "/resources" },
 ];
-const calculatorOptions = [
-  { label: "EMI Calculator" },
-  { label: "Home Loan Calculator" },
-  { label: "Education Loan EMI Calculator" },
-  { label: "Personal Loan Calculator" },
-  { label: "Currency Converter" },
-  { label: "My Tools & Calculators" },
+
+const getInvolvedOptions = [
+  { label: "Volunteer", href: "/volunteer" },
+  { label: "Donate", href: "/donate" },
+  { label: "Share Your Story", href: "/stories" },
 ];
-// Footer: main links should navigate, others are placeholders
+
+// Footer links for elder welfare
 const footerLinks = [
   {
     title: "Explore",
     links: [
-      { label: "Budgeting", href: "/budgeting" },
-      { label: "Credit", href: "/credit" },
-      { label: "Investment", href: "/investment" },
-      { label: "Saving", href: "/saving" },
-      { label: "Safety", href: "/safety" }
+      { label: "Care Services", href: "/care-services" },
+      { label: "Health & Wellness", href: "/health-wellness" },
+      { label: "Community Support", href: "/community" },
+      { label: "Legal & Financial Help", href: "/legal-financial" },
+      { label: "Resources", href: "/resources" }
     ]
   },
   {
-    title: "What's new",
+    title: "Get Involved",
     links: [
-      { label: "FinEdge AI" },
-      { label: "Financial Reports" },
-      { label: "Upcoming Features" },
-      { label: "Blog" },
-      { label: "Webinars" }
+      { label: "Volunteer", href: "/volunteer" },
+      { label: "Donate", href: "/donate" },
+      { label: "Share Your Story", href: "/stories" }
     ]
   },
   {
-    title: "Tools & Calculators",
+    title: "About",
     links: [
-      { label: "EMI Calculator" },
-      { label: "Loan Tools" },
-      { label: "Currency Converter" },
-      { label: "My Tools" }
+      { label: "Our Mission", href: "/about" },
+      { label: "Contact", href: "/contact" },
+      { label: "FAQ", href: "/faq" }
     ]
   },
   {
-    title: "Company",
+    title: "Legal",
     links: [
-      { label: "About" },
-      { label: "Support" },
-      { label: "Careers" },
-      { label: "Privacy" },
-      { label: "Terms" }
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" }
     ]
   }
 ];
 
-// Pages where the header and/or footer should appear
+// Pages where the header/footer should appear
 const mainHeaderPages = [
-  '/', '/budgeting', '/credit', '/safety', '/saving', '/investment'
+  '/', '/care-services', '/health-wellness', '/community', '/legal-financial', '/resources'
 ];
 const showFooterPages = mainHeaderPages;
 
 export default function Layout({ children }) {
   const pathname = usePathname();
-  // Show header on main and all finance pages
   const showHeader = mainHeaderPages.includes(pathname);
-  // Show footer on main and all finance pages
   const showFooter = showFooterPages.includes(pathname);
 
   // Popover state for header
   const [exploreAnchor, setExploreAnchor] = useState(null);
-  const [calcAnchor, setCalcAnchor] = useState(null);
+  const [involvedAnchor, setInvolvedAnchor] = useState(null);
 
   return (
     <html lang="en">
-      <body style={{ background: "#f5f8fa" }}>
-        {/* HEADER: on main + all finance pages */}
+      <body style={{ background: "#f7fafc" }}>
+        {/* HEADER: on main + elder welfare pages */}
         {showHeader && (
           <Box
             sx={{
@@ -103,14 +95,16 @@ export default function Layout({ children }) {
             }}
           >
             <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+              {/* Logo and Name */}
               <Typography variant="h5" sx={{
-                color: "#283593",
+                color: "#2E7D32",
                 fontWeight: 700,
                 fontFamily: "inherit",
                 letterSpacing: 1,
                 mr: 3
               }}>
-                finedge
+                <span role="img" aria-label="care" style={{ marginRight: 8 }}>🤝</span>
+                ElderWelfare
               </Typography>
               <Box sx={{ display: "flex", gap: 1 }}>
                 <Button
@@ -146,39 +140,42 @@ export default function Layout({ children }) {
                 <Button
                   color="primary"
                   endIcon={<ExpandMoreIcon />}
-                  onClick={e => setCalcAnchor(e.currentTarget)}
+                  onClick={e => setInvolvedAnchor(e.currentTarget)}
                   sx={{ textTransform: "none", fontWeight: 600 }}
                 >
-                  Financial Tools & Calculators
+                  Get Involved
                 </Button>
                 <Popover
-                  open={Boolean(calcAnchor)}
-                  anchorEl={calcAnchor}
-                  onClose={() => setCalcAnchor(null)}
+                  open={Boolean(involvedAnchor)}
+                  anchorEl={involvedAnchor}
+                  onClose={() => setInvolvedAnchor(null)}
                   anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
                   transformOrigin={{ vertical: 'top', horizontal: 'left' }}
                 >
                   <Box sx={{ p: 1 }}>
-                    {calculatorOptions.map(opt =>
+                    {getInvolvedOptions.map(opt =>
                       <Button
                         key={opt.label}
+                        href={opt.href}
+                        component={Link}
                         fullWidth
                         sx={{ justifyContent: "flex-start", fontWeight: 500 }}
-                        disabled // not functional for now
+                        onClick={() => setInvolvedAnchor(null)}
                       >
                         {opt.label}
                       </Button>
                     )}
                   </Box>
                 </Popover>
-                <Button color="primary" sx={{ textTransform: "none", fontWeight: 600 }} disabled>
-                  Support
-                </Button>
-                <Button color="primary" sx={{ textTransform: "none", fontWeight: 600 }} disabled>
+                <Button color="primary" href="/about" sx={{ textTransform: "none", fontWeight: 600 }}>
                   About
+                </Button>
+                <Button color="primary" href="/contact" sx={{ textTransform: "none", fontWeight: 600 }}>
+                  Contact
                 </Button>
               </Box>
             </Box>
+            {/* Auth buttons on home page */}
             {pathname === '/' && (
               <Box sx={{ display: "flex", gap: 1 }}>
                 <Button variant="text" href="/login" sx={{ fontWeight: 500 }}>LOGIN</Button>
@@ -189,11 +186,10 @@ export default function Layout({ children }) {
         )}
         {/* MAIN CONTENT */}
         <main style={{ minHeight: "70vh" }}>
-          {/* Only show main page content on /, else children */}
           {pathname === '/' ? <MainPageContent /> : children}
         </main>
-        {/* FOOTER: only on main, budgeting, credit, safety, saving, investment */}
-        {showFooter && <FooterLikeMicrosoft />}
+        {/* FOOTER: on main and all elder welfare pages */}
+        {showFooter && <FooterElderWelfare />}
       </body>
     </html>
   );
@@ -211,37 +207,36 @@ function MainPageContent() {
         minHeight: 320,
         px: { xs: 2, md: 8 },
         pt: 6,
-        background: "url('/images/finance-hero.jpg') center/cover no-repeat, linear-gradient(to bottom, #e8eaf6 70%, #21243d 100%)",
+        background: "url('/images/elder-hero.png') center/cover no-repeat, linear-gradient(to bottom, #e8f5e9 70%, #2E7D32 100%)",
         position: "relative"
       }}>
         <Box sx={{ maxWidth: 480, pb: 5 }}>
           <Typography variant="h3" sx={{ color: "white", fontWeight: 800, mb: 1, textAlign: "left" }}>
-            Welcome to FinEdge
+            Welcome to ElderWelfare
           </Typography>
           <Typography variant="h6" color="grey.300" sx={{ mb: 2, textAlign: "left" }}>
-            Securely manage your finances and unlock your financial potential with ease.
+            Caring for elders. Building dignity, community, and support—for today and tomorrow.
           </Typography>
           <Paper elevation={3} sx={{ p: 3, mt: 2, textAlign: 'left', borderRadius: 3, background: "#fff8" }}>
             <Typography paragraph sx={{ mb: 1 }}>
-              <b>FinEdge</b> is your all-in-one financial companion—helping you budget, save, invest, and protect your wealth.
-              Our platform is designed for everyone: whether you’re a student, professional, or retiree, you’ll find tools and guidance for smarter money management.
+              <b>ElderWelfare</b> is your platform for elder care and mutual support. By caring for elders now, you help build a community where everyone is supported—now and in the future.
             </Typography>
             <Typography paragraph sx={{ mb: 1 }}>
-              <b>Specialty:</b> FinEdge is powered by an <b>AI assistant</b> that provides:
+              <b>What We Offer:</b>
             </Typography>
             <Box component="ul" sx={{ pl: 4 }}>
-              <li>Personalized savings advice</li>
-              <li>Basic financial knowledge</li>
-              <li>Guidance on money transfers within FinEdge</li>
-              <li>Explanations of how money works</li>
-              <li>And more—tailored for your needs!</li>
+              <li>Care services: health, home, wellness, and companionship</li>
+              <li>Legal and financial help for elders</li>
+              <li>Community and volunteer support</li>
+              <li>Resource library for guides and assistance</li>
+              <li>Share your story—be part of our caring community!</li>
             </Box>
             <Typography paragraph sx={{ mt: 2 }}>
-              <b>Get started by exploring our tools for budgeting, saving, investing, credit, and safety—from the header buttons above.</b>
+              <b>Get started by exploring our services, joining our volunteer program, or accessing resources—from the header buttons above.</b>
             </Typography>
           </Paper>
         </Box>
-        {/* Finance-themed image with dark tent/gradient at bottom */}
+        {/* Eldercare-themed image */}
         <Box sx={{ flex: 1, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
           <Box sx={{
             width: 0,
@@ -252,22 +247,22 @@ function MainPageContent() {
             position: "relative",
             overflow: "hidden"
           }}>
-            {/* Dark tent effect */}
+            {/* Replace with your own image */}
             <Box sx={{
               position: "absolute",
               left: 0, bottom: 0, width: "100%", height: "60%",
-              background: "url('/images/finance-hero.jpg') center/cover no-repeat, linear-gradient(to bottom, #e8eaf6 70%, #21243d 100%)"
+              background: "url('/images/elder-hero.png') center/cover no-repeat, linear-gradient(to bottom, #e8f5e9 70%, #2E7D32 100%)"
             }} />
           </Box>
         </Box>
       </Box>
-      {/* Optionally, add more images/features below */}
+      {/* Add more features and testimonials below as needed */}
     </Box>
   );
 }
 
-// Footer with navigation for main finance links
-function FooterLikeMicrosoft() {
+// Footer for ElderWelfare
+function FooterElderWelfare() {
   return (
     <Box sx={{
       bgcolor: "#f7f7f7",
@@ -287,7 +282,7 @@ function FooterLikeMicrosoft() {
                       <Link href={link.href} passHref legacyBehavior>
                         <ListItemText
                           primary={
-                            <Typography sx={{ fontSize: "1rem", color: "#283593", cursor: "pointer" }}>
+                            <Typography sx={{ fontSize: "1rem", color: "#2E7D32", cursor: "pointer" }}>
                               {link.label}
                             </Typography>
                           }
@@ -320,12 +315,11 @@ function FooterLikeMicrosoft() {
             Your Privacy Choices
           </Box>
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-            Contact FinEdge
+            Contact ElderWelfare
             <span>Privacy</span>
             <span>Terms of use</span>
-            <span>Trademarks</span>
             <span>About our ads</span>
-            <span>© FinEdge 2025</span>
+            <span>© ElderWelfare 2025</span>
           </Box>
         </Box>
       </Container>
