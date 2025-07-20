@@ -28,8 +28,8 @@ export default function OtpClient() {
 
   useEffect(() => {
     // Get phone, countryCode, username from sessionStorage
-    const _phone = sessionStorage.getItem('phone');
-    const _countryCode = sessionStorage.getItem('countryCode');
+const _phone = sessionStorage.getItem('phone') || localStorage.getItem('otp_temp_phone');
+const _countryCode = sessionStorage.getItem('countryCode') || localStorage.getItem('otp_temp_countryCode');
     const _username = sessionStorage.getItem('username');
     setPhone(_phone || '');
     setCountryCode(_countryCode || '');
@@ -37,7 +37,7 @@ export default function OtpClient() {
 
     // Send OTP only if phone and countryCode exist
     if (_phone && _countryCode) {
-      sendOtp(_phone, _countryCode, _username);
+      sendOtp(_countryCode + _phone);
     } else {
       setSnackbar({
         open: true,
@@ -49,23 +49,21 @@ export default function OtpClient() {
     // eslint-disable-next-line
   }, []);
 
-  const sendOtp = async (_phone, _countryCode, _username) => {
+  const sendOtp = async (_fullPhone) => {
     setSending(true);
     try {
       const res = await fetch('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone: _phone,
-          countryCode: _countryCode,
-          username: _username,
+          phone: _fullPhone,
         }),
       });
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && data.success) {
         setSnackbar({ open: true, message: 'OTP sent to your phone.', severity: 'success' });
       } else {
-        setSnackbar({ open: true, message: data.error || 'Failed to send OTP.', severity: 'error' });
+        setSnackbar({ open: true, message: data.message || 'Failed to send OTP.', severity: 'error' });
       }
     } catch (e) {
       setSnackbar({ open: true, message: 'Error sending OTP.', severity: 'error' });
@@ -109,7 +107,7 @@ export default function OtpClient() {
   // Optionally, let user resend the OTP
   const handleResend = async () => {
     if (!phone || !countryCode) return;
-    await sendOtp(phone, countryCode, username);
+    await sendOtp(countryCode + phone);
   };
 
   return (

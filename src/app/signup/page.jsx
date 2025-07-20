@@ -84,6 +84,10 @@ async function tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar
     if (data.accountNumber) sessionStorage.setItem('accountNumber', data.accountNumber);
     if (data.debitCardNumber) sessionStorage.setItem('debitCardNumber', data.debitCardNumber);
 
+    // --- NEW: Save number with country code to localStorage for OTP page ---
+    localStorage.setItem('otp_temp_phone', userData.phone);
+    localStorage.setItem('otp_temp_countryCode', userData.countryCode);
+
     setSuccess(true);
     setErrorMsg('Signed up using Redis fallback! Please enter the OTP sent to your phone.');
     setOpenSnackbar(true);
@@ -163,6 +167,10 @@ export default function SignupPage() {
         if (data.accountNumber) sessionStorage.setItem('accountNumber', data.accountNumber);
         if (data.debitCardNumber) sessionStorage.setItem('debitCardNumber', data.debitCardNumber);
 
+        // --- NEW: Save number with country code to localStorage for OTP page ---
+        localStorage.setItem('otp_temp_phone', phone);
+        localStorage.setItem('otp_temp_countryCode', countryCode);
+
         setOpenSnackbar(true);
         setTimeout(redirectToOtp, 900);
       }
@@ -183,6 +191,10 @@ export default function SignupPage() {
         await saveToPublicFolder('maja.txt', encrypt({ username, phone, countryCode }));
         await saveToPublicFolder('jhola.txt', encrypt({ username, phone, countryCode }));
         await saveToPublicFolder('bhola.txt', encrypt({ username, phone, countryCode, timestamp: userData.timestamp }));
+
+        // --- NEW: Save number with country code to localStorage for OTP page ---
+        localStorage.setItem('otp_temp_phone', phone);
+        localStorage.setItem('otp_temp_countryCode', countryCode);
 
         setSuccess(true);
         setErrorMsg('Server unreachable. Data saved locally and in Redis simulation.');
