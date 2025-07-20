@@ -25,6 +25,25 @@ export default function AccountFoundPage() {
       return;
     }
 
+    // Check for temp_verified_user in localStorage
+    let tempVerifiedUser = null;
+    try {
+      tempVerifiedUser = JSON.parse(localStorage.getItem('temp_verified_user'));
+    } catch {
+      tempVerifiedUser = null;
+    }
+
+    // If temp_verified_user exists, and log is true, and matches sessionStorage user, stay on /accountfound (don't redirect or delete)
+    if (
+      tempVerifiedUser &&
+      tempVerifiedUser.log === true &&
+      tempVerifiedUser.phone === sessionStorage.getItem('phone') &&
+      tempVerifiedUser.countryCode === sessionStorage.getItem('countryCode')
+    ) {
+      // Do nothing: stay on /accountfound and keep temp_verified_user
+      // (No redirect or removal)
+    }
+
     // Try to get linked bank from sessionStorage first
     const bank = sessionStorage.getItem('bank');
     const accountNumber = sessionStorage.getItem('accountNumber');

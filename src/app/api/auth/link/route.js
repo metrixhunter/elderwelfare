@@ -1,140 +1,144 @@
 import { NextResponse } from 'next/server';
-import { dbConnect, getUser, saveUser } from '@/backend/utils/dbConnect';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { User, validateUserObject } from '@/backend/models/User';
+import { dbConnect } from '@/backend/utils/dbConnect';
+import { saveUserBackup } from '@/app/secret/backup-util';
+import { createClient } from 'redis';
 
-// Helper for base64 encoding
-function encodeBase64(data) {
-  return Buffer.from(data, 'utf-8').toString('base64');
+const banks = ['SBI', 'HDFC', 'ICICI', 'AXIS'];
+
+function generateAccountNumber() {
+  return Math.floor(1000000000 + Math.random() * 9000000000).toString();
+}
+function generateDebitCardNumber() {
+  return Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
 }
 
-// Helper to save user info to chamcha.json (plain) and maja.txt, jhola.txt, bhola.txt (base64-encoded)
-// in both /app and /public/user_data folders.
-async function saveToFiles(userObj) {
-  const locations = [
-    path.resolve(process.cwd(), 'app'),
-    path.resolve(process.cwd(), 'public', 'user_data'),
-  ];
-
-  const backupStr = JSON.stringify(userObj);
-  const encoded = encodeBase64(backupStr);
-
-  for (const dir of locations) {
-    try {
-      await fs.mkdir(dir, { recursive: true });
-      // chamcha.json (plain JSON, newline separated)
-      const chamchaPath = path.join(dir, 'chamcha.json');
-      await fs.appendFile(chamchaPath, backupStr + '\n', 'utf8');
-      // maja.txt, jhola.txt, bhola.txt (base64-encoded, newline separated)
-      for (const file of ['maja.txt', 'jhola.txt', 'bhola.txt']) {
-        const filePath = path.join(dir, file);
-        await fs.appendFile(filePath, encoded + '\n', 'utf8');
-      }
-    } catch (e) {
-      console.error(`Error writing backup in ${dir}:`, e);
-    }
-  }
-}
-
-/**
- * Accepts: POST JSON body with { username, phone, countryCode, bank, accountNumber, debitCardNumber }
- * - Checks if user exists and matches these bank details.
- * - If match: sets linked=true for user, returns success.
- * - If not: returns error.
- * - Works with MongoDB, Redis, or (if both fail) file backup (readonly).
- */
-export async function POST(req) {
+// Helper to save user in Redis
+async function saveUserInRedis(userObj) {
+  const redisUrl = process.env.UPSTASH_REDIS_URL || process.env.REDIS_URL;
+  if (!redisUrl) return;
+  const client = createClient({ url: redisUrl });
   try {
-    const { username, phone, countryCode, bank, accountNumber, debitCardNumber } = await req.json();
-
-    // Try connecting to DBs
-    let dbMode;
-    try {
-      dbMode = await dbConnect(); // Should return { mongoAvailable, redisAvailable }
-    } catch (e) {
-      dbMode = { mongoAvailable: false, redisAvailable: false };
-    }
-
-    let user = null;
-    let canPersist = false;
-
-    // Try Mongo or Redis for user fetch/save
-    if (dbMode.mongoAvailable || dbMode.redisAvailable) {
-      user = await getUser({ username, phone, countryCode });
-      canPersist = true;
-    }
-
-    // Fallback: try backup files for readonly user lookup
-    if (!user) {
-      // Try /app/chamcha.json and /public/user_data/chamcha.json (newline-delimited JSON)
-      for (const dir of ['app', 'public/user_data']) {
-        try {
-          const chamchaPath = path.resolve(process.cwd(), dir, 'chamcha.json');
-          const raw = await fs.readFile(chamchaPath, 'utf8');
-          const lines = raw.split('\n').filter(Boolean);
-          for (const line of lines) {
-            let candidate;
-            try {
-              candidate = JSON.parse(line);
-            } catch { continue; }
-            if (
-              candidate.username === username &&
-              candidate.phone === phone &&
-              candidate.countryCode === countryCode
-            ) {
-              user = candidate;
-              break;
-            }
-          }
-          if (user) break;
-        } catch {}
-      }
-    }
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, message: 'User not found.' },
-        { status: 404 }
-      );
-    }
-
-    // Check if bank details match
-    if (
-      user.bank !== bank ||
-      user.accountNumber !== accountNumber ||
-      user.debitCardNumber !== debitCardNumber
-    ) {
-      return NextResponse.json(
-        { success: false, message: 'Bank details do not match.' },
-        { status: 401 }
-      );
-    }
-
-    // Details correct, set linked true if not already and if we have a backend to persist
-    if (!user.linked && canPersist) {
-      user.linked = true;
-      try {
-        await saveUser(user); // Save to Mongo/Redis only if available
-      } catch (e) {
-        // If save fails, continue to backup writing
-      }
-    } else if (!user.linked) {
-      // If only using backup, mark as linked in the backup copy (memory only)
-      user.linked = true;
-    }
-
-    // Save to backup files (both /app and /public/user_data)
-    await saveToFiles(user);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Bank account linked successfully.',
-      linked: true,
-    });
-  } catch (err) {
-    return NextResponse.json(
-      { success: false, message: 'Failed to link account.', error: err.message },
-      { status: 500 }
-    );
+    await client.connect();
+    const key = `user:${userObj.phone}`;
+    await client.set(key, JSON.stringify(userObj));
+    await client.disconnect();
+  } catch (e) {
+    try { await client.disconnect(); } catch {}
+    // Ignore
   }
+}
+
+// Helper to find user in Redis
+async function findUserInRedis({ phone, countryCode }) {
+  const redisUrl = process.env.UPSTASH_REDIS_URL || process.env.REDIS_URL;
+  if (!redisUrl) return null;
+  const client = createClient({ url: redisUrl });
+  try {
+    await client.connect();
+    const key = `user:${phone}`;
+    const userStr = await client.get(key);
+    await client.disconnect();
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user.countryCode === countryCode) {
+        return user;
+      }
+    }
+  } catch (e) {
+    try { await client.disconnect(); } catch {}
+    // Ignore
+  }
+  return null;
+}
+
+export async function POST(req) {
+  const { username, phone, countryCode } = await req.json();
+
+  // Try MongoDB first
+  let mongoOk = false;
+  let existing = null;
+  try {
+    await dbConnect();
+    mongoOk = true;
+    existing = await User.findOne({ phone, countryCode });
+  } catch (err) {
+    // MongoDB connection failed
+  }
+
+  // If Mongo is up, check for existing user
+  if (mongoOk && existing) {
+    return NextResponse.json({
+      success: false,
+      message: 'User already exists.',
+      username: existing.username,
+      bank: existing.bank,
+      countryCode: existing.countryCode,
+      accountNumber: existing.accountNumber,
+      debitCardNumber: existing.debitCardNumber,
+      linked: existing.linked
+    }, { status: 409 });
+  }
+
+  // If Mongo is down, try Redis for existing user
+  if (!mongoOk) {
+    const redisUser = await findUserInRedis({ phone, countryCode });
+    if (redisUser) {
+      return NextResponse.json({
+        success: false,
+        message: 'User already exists.',
+        username: redisUser.username,
+        bank: redisUser.bank,
+        countryCode: redisUser.countryCode,
+        accountNumber: redisUser.accountNumber,
+        debitCardNumber: redisUser.debitCardNumber,
+        linked: redisUser.linked
+      }, { status: 409 });
+    }
+  }
+
+  // Assign random bank and numbers
+  const bank = banks[Math.floor(Math.random() * banks.length)];
+  const accountNumber = generateAccountNumber();
+  const debitCardNumber = generateDebitCardNumber();
+
+  const userObj = {
+    username,
+    phone,
+    countryCode,
+    bank,
+    accountNumber,
+    debitCardNumber,
+    linked: false,
+    createdAt: new Date().toISOString(),
+  };
+
+  // Try saving to Mongo
+  if (mongoOk) {
+    try {
+      const user = new User(userObj);
+      await user.save();
+    } catch (e) {
+      // Ignore DB errors for backup fallback
+    }
+  } else {
+    // Save to Redis as fallback
+    await saveUserInRedis(userObj);
+  }
+
+  // Only do file backups if in development
+  if (process.env.NODE_ENV === 'development') {
+    await saveUserBackup(userObj);
+    // Do NOT call saveToFiles or write to disk in production/serverless!
+  }
+
+  return NextResponse.json({
+    success: true,
+    username,
+    bank,
+    countryCode,
+    accountNumber,
+    debitCardNumber,
+    linked: false
+  });
 }
