@@ -15,7 +15,7 @@ async function fetchAllUsersFromRedis(redisClient) {
     if (val) {
       try {
         const obj = JSON.parse(val);
-        // Remove sensitive fields if any (add/remove as needed)
+        // Remove sensitive fields
         delete obj.password;
         users.push(obj);
       } catch {}
@@ -35,7 +35,11 @@ function fetchAllUsersFromBackup() {
       .split('\n')
       .filter(Boolean)
       .map(line => {
-        try { return JSON.parse(line); } catch { return null; }
+        try { 
+          const obj = JSON.parse(line); 
+          delete obj.password;
+          return obj;
+        } catch { return null; }
       })
       .filter(Boolean);
   } catch {
@@ -44,7 +48,7 @@ function fetchAllUsersFromBackup() {
 }
 
 export async function GET() {
-  // Try Mongo first, then Redis
+  // Try Mongo first, then Redis, then backup file
   let mongoAvailable = false;
   let redisAvailable = false;
   let redisClient = null;
@@ -62,6 +66,7 @@ export async function GET() {
   // --- Try MongoDB
   if (mongoAvailable) {
     try {
+      // Exclude password, internal Mongo fields
       const users = await User.find({}, '-password -__v -_id').lean();
       return NextResponse.json(users);
     } catch (err) {
@@ -90,5 +95,8 @@ export async function GET() {
   }
 
   // --- If all fail
-  return NextResponse.json({ error: 'Server error: cannot retrieve users from MongoDB, Redis, or backup' }, { status: 500 });
+  return NextResponse.json(
+    { error: 'Server error: cannot retrieve users from MongoDB, Redis, or backup' },
+    { status: 500 }
+  );
 }

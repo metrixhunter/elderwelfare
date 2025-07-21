@@ -15,8 +15,10 @@ import {
   InputLabel,
   FormControl,
   Box,
+  IconButton,
+  Avatar,
 } from '@mui/material';
-import FinEdgeLogo from '@/app/components/FinEdgeLogo';
+import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import { encrypt } from '@/app/utils/encryption';
 
 const countryCodes = [
@@ -29,8 +31,6 @@ const countryCodes = [
   { code: '+971', label: 'UAE (+971)' },
   { code: '+86', label: 'China (+86)' },
 ];
-
-const banks = ['ICICI', 'AXIS', 'SBI', 'HDFC'];
 
 // Helper for saving to public/user_data via the browser (append)
 async function saveToPublicFolder(filename, value) {
@@ -50,21 +50,9 @@ function saveToRedisLike(phone, userObj) {
   } catch {}
 }
 
-// Helper: Generate random bank, account number, debit card number
-function getRandomBank() {
-  return banks[Math.floor(Math.random() * banks.length)];
-}
-function getRandomAccountNumber() {
-  return Math.floor(1000000000 + Math.random() * 9000000000).toString();
-}
-function getRandomDebitCardNumber() {
-  return Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
-}
-
 // Helper: Try Redis API if Mongo fails
 async function tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar, redirectToOtp) {
   try {
-    // Try a dedicated redis signup endpoint (if you have one)
     const res = await fetch('/api/auth/redis-signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -78,14 +66,10 @@ async function tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar
 
     // Save to sessionStorage for OTP and later flow
     sessionStorage.setItem('username', userData.username);
-    sessionStorage.setItem('phone', userData.phone);
+    sessionStorage.setItem('phone', userData.phoneNumbers[0] || '');
     sessionStorage.setItem('countryCode', userData.countryCode);
-    if (data.bank) sessionStorage.setItem('bank', data.bank);
-    if (data.accountNumber) sessionStorage.setItem('accountNumber', data.accountNumber);
-    if (data.debitCardNumber) sessionStorage.setItem('debitCardNumber', data.debitCardNumber);
 
-    // --- NEW: Save number with country code to localStorage for OTP page ---
-    localStorage.setItem('otp_temp_phone', userData.phone);
+    localStorage.setItem('otp_temp_phone', userData.phoneNumbers[0] || '');
     localStorage.setItem('otp_temp_countryCode', userData.countryCode);
 
     setSuccess(true);
@@ -99,13 +83,49 @@ async function tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar
 }
 
 export default function SignupPage() {
+  // Multiple names, phone numbers, emails, birthdates, ages, images as arrays
   const [username, setUsername] = useState('');
-  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [names, setNames] = useState(['']);
+  const [phoneNumbers, setPhoneNumbers] = useState(['']);
   const [countryCode, setCountryCode] = useState(countryCodes[0].code);
+  const [emails, setEmails] = useState(['']);
+  const [birthdates, setBirthdates] = useState(['']);
+  const [ages, setAges] = useState(['']);
+  const [address, setAddress] = useState('');
+  const [images, setImages] = useState([]); // array of image files
+  const [imagePreviews, setImagePreviews] = useState([]);
+
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const router = useRouter();
+
+  // Dynamic fields helpers
+  const handleArrayChange = (setter, arr, idx, value) => {
+    const newArr = [...arr];
+    newArr[idx] = value;
+    setter(newArr);
+  };
+  const handleAddField = (setter, arr) => {
+    setter([...arr, '']);
+  };
+  const handleRemoveField = (setter, arr, idx) => {
+    if (arr.length > 1) {
+      const newArr = arr.slice();
+      newArr.splice(idx, 1);
+      setter(newArr);
+    }
+  };
+
+  // Image upload
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files.length) {
+      const files = Array.from(e.target.files);
+      setImages(files);
+      setImagePreviews(files.map(file => URL.createObjectURL(file)));
+    }
+  };
 
   const redirectToOtp = () => {
     router.push(`/otp?redirect=/accountfound`);
@@ -117,26 +137,54 @@ export default function SignupPage() {
       setOpenSnackbar(true);
       return;
     }
-    if (!phone.match(/^\d{10}$/)) {
-      setErrorMsg('Please enter a valid 10-digit phone number.');
+    if (!password) {
+      setErrorMsg('Please enter a password.');
       setOpenSnackbar(true);
       return;
     }
-    if (!countryCode) {
-      setErrorMsg('Please select your country code.');
+    if (names.some(name => !name.trim())) {
+      setErrorMsg('Please fill all name fields.');
+      setOpenSnackbar(true);
+      return;
+    }
+    if (phoneNumbers.some(p => !p.match(/^\d{10}$/))) {
+      setErrorMsg('Please enter valid 10-digit phone numbers.');
+      setOpenSnackbar(true);
+      return;
+    }
+    if (emails.some(e => !e.match(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/))) {
+      setErrorMsg('Please enter valid emails.');
+      setOpenSnackbar(true);
+      return;
+    }
+    if (birthdates.some(bd => !bd)) {
+      setErrorMsg('Please enter all birthdates.');
+      setOpenSnackbar(true);
+      return;
+    }
+    if (ages.some(age => !age || isNaN(age) || age < 0)) {
+      setErrorMsg('Please enter valid ages.');
+      setOpenSnackbar(true);
+      return;
+    }
+    if (!address.trim()) {
+      setErrorMsg('Please enter your address.');
       setOpenSnackbar(true);
       return;
     }
 
-    // If signup is saved locally, assign random bank/account/card
+    // Prepare userData for API (images handled as URLs/previews for now)
     const userData = {
       username,
-      phone,
+      password,
+      names,
       countryCode,
-      bank: getRandomBank(),
-      accountNumber: getRandomAccountNumber(),
-      debitCardNumber: getRandomDebitCardNumber(),
-      linked: false,
+      phoneNumbers,
+      emails,
+      birthdates,
+      ages,
+      address,
+      images: imagePreviews,
       timestamp: new Date().toISOString(),
     };
 
@@ -145,12 +193,11 @@ export default function SignupPage() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, phone, countryCode }),
+        body: JSON.stringify(userData),
       });
       const data = await res.json();
 
       if (!res.ok) {
-        // If error is MongoDB unreachable, try Redis
         if (data.message && data.message.toLowerCase().includes('mongo')) {
           const redisSuccess = await tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar, redirectToOtp);
           if (redisSuccess) return;
@@ -159,41 +206,32 @@ export default function SignupPage() {
         setOpenSnackbar(true);
       } else {
         setSuccess(true);
-        // Save all data to sessionStorage for OTP and later flow
         sessionStorage.setItem('username', username);
-        sessionStorage.setItem('phone', phone);
+        sessionStorage.setItem('phone', phoneNumbers[0] || '');
         sessionStorage.setItem('countryCode', countryCode);
-        if (data.bank) sessionStorage.setItem('bank', data.bank);
-        if (data.accountNumber) sessionStorage.setItem('accountNumber', data.accountNumber);
-        if (data.debitCardNumber) sessionStorage.setItem('debitCardNumber', data.debitCardNumber);
 
-        // --- NEW: Save number with country code to localStorage for OTP page ---
-        localStorage.setItem('otp_temp_phone', phone);
+        localStorage.setItem('otp_temp_phone', phoneNumbers[0] || '');
         localStorage.setItem('otp_temp_countryCode', countryCode);
 
         setOpenSnackbar(true);
         setTimeout(redirectToOtp, 900);
       }
     } catch (err) {
-      // Server unreachable — fallback: save locally to both localStorage and to keys simulating public/user_data and redis
+      // Server unreachable — fallback: save locally
       try {
-        // Save to simulated Redis
-        saveToRedisLike(phone, userData);
+        saveToRedisLike(phoneNumbers[0] || '', userData);
 
-        // Save local version for "mongo"
         localStorage.setItem('chamcha.json', JSON.stringify(userData));
-        localStorage.setItem('maja.txt', encrypt({ username, phone, countryCode }));
-        localStorage.setItem('jhola.txt', encrypt({ username, phone, countryCode }));
-        localStorage.setItem('bhola.txt', encrypt({ username, phone, countryCode, timestamp: userData.timestamp }));
+        localStorage.setItem('maja.txt', encrypt(userData));
+        localStorage.setItem('jhola.txt', encrypt(userData));
+        localStorage.setItem('bhola.txt', encrypt({ ...userData, timestamp: userData.timestamp }));
 
-        // Save to public folder simulation (localStorage-based fallback)
         await saveToPublicFolder('chamcha.json', JSON.stringify(userData));
-        await saveToPublicFolder('maja.txt', encrypt({ username, phone, countryCode }));
-        await saveToPublicFolder('jhola.txt', encrypt({ username, phone, countryCode }));
-        await saveToPublicFolder('bhola.txt', encrypt({ username, phone, countryCode, timestamp: userData.timestamp }));
+        await saveToPublicFolder('maja.txt', encrypt(userData));
+        await saveToPublicFolder('jhola.txt', encrypt(userData));
+        await saveToPublicFolder('bhola.txt', encrypt({ ...userData, timestamp: userData.timestamp }));
 
-        // --- NEW: Save number with country code to localStorage for OTP page ---
-        localStorage.setItem('otp_temp_phone', phone);
+        localStorage.setItem('otp_temp_phone', phoneNumbers[0] || '');
         localStorage.setItem('otp_temp_countryCode', countryCode);
 
         setSuccess(true);
@@ -208,9 +246,8 @@ export default function SignupPage() {
   };
 
   return (
-    <Container maxWidth="xs" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <Container maxWidth="sm" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
       <Paper elevation={3} style={{ padding: '2rem', width: '100%', textAlign: 'center' }}>
-        <FinEdgeLogo />
         <Typography variant="h5" gutterBottom>Sign Up</Typography>
         {success && <Alert severity="success">Signed up successfully! Please enter the OTP sent to your phone.</Alert>}
 
@@ -222,30 +259,164 @@ export default function SignupPage() {
           onChange={(e) => setUsername(e.target.value)}
         />
 
-        <Box display="flex" gap={1} alignItems="center">
-          <FormControl sx={{ minWidth: 100 }}>
-            <InputLabel id="country-code-label">Code</InputLabel>
-            <Select
-              labelId="country-code-label"
-              id="country-code"
-              value={countryCode}
-              label="Code"
-              onChange={e => setCountryCode(e.target.value)}
-              size="small"
-            >
-              {countryCodes.map((option) => (
-                <MenuItem value={option.code} key={option.code}>{option.label}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            label="Phone Number"
-            fullWidth
-            margin="normal"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/, ''))}
-            sx={{ flex: 1 }}
+        <TextField
+          label="Password"
+          type="password"
+          fullWidth
+          margin="normal"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
+        {/* Multiple Names */}
+        {names.map((name, idx) => (
+          <Box key={idx} display="flex" gap={1} alignItems="center" mt={1}>
+            <TextField
+              label={`Name ${names.length > 1 ? idx + 1 : ''}`}
+              fullWidth
+              margin="normal"
+              value={name}
+              onChange={e => handleArrayChange(setNames, names, idx, e.target.value)}
+            />
+            {names.length > 1 && (
+              <Button color="error" onClick={() => handleRemoveField(setNames, names, idx)}>-</Button>
+            )}
+            {idx === names.length - 1 && (
+              <Button onClick={() => handleAddField(setNames, names)}>+</Button>
+            )}
+          </Box>
+        ))}
+
+        {/* Multiple Phone Numbers */}
+        <Box display="flex" flexDirection="column" gap={1}>
+          {phoneNumbers.map((phone, idx) => (
+            <Box key={idx} display="flex" gap={1} alignItems="center" mt={1}>
+              {idx === 0 && (
+                <FormControl sx={{ minWidth: 100 }}>
+                  <InputLabel id="country-code-label">Code</InputLabel>
+                  <Select
+                    labelId="country-code-label"
+                    id="country-code"
+                    value={countryCode}
+                    label="Code"
+                    onChange={e => setCountryCode(e.target.value)}
+                    size="small"
+                  >
+                    {countryCodes.map((option) => (
+                      <MenuItem value={option.code} key={option.code}>{option.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+              <TextField
+                label={`Phone Number ${phoneNumbers.length > 1 ? idx + 1 : ''}`}
+                fullWidth
+                margin="normal"
+                value={phone}
+                onChange={e => handleArrayChange(setPhoneNumbers, phoneNumbers, idx, e.target.value.replace(/\D/, ''))}
+                sx={{ flex: 1 }}
+              />
+              {phoneNumbers.length > 1 && (
+                <Button color="error" onClick={() => handleRemoveField(setPhoneNumbers, phoneNumbers, idx)}>-</Button>
+              )}
+              {idx === phoneNumbers.length - 1 && (
+                <Button onClick={() => handleAddField(setPhoneNumbers, phoneNumbers)}>+</Button>
+              )}
+            </Box>
+          ))}
+        </Box>
+
+        {/* Multiple Emails */}
+        {emails.map((email, idx) => (
+          <Box key={idx} display="flex" gap={1} alignItems="center" mt={1}>
+            <TextField
+              label={`Email ${emails.length > 1 ? idx + 1 : ''}`}
+              fullWidth
+              margin="normal"
+              value={email}
+              onChange={e => handleArrayChange(setEmails, emails, idx, e.target.value)}
+            />
+            {emails.length > 1 && (
+              <Button color="error" onClick={() => handleRemoveField(setEmails, emails, idx)}>-</Button>
+            )}
+            {idx === emails.length - 1 && (
+              <Button onClick={() => handleAddField(setEmails, emails)}>+</Button>
+            )}
+          </Box>
+        ))}
+
+        {/* Multiple Birthdates */}
+        {birthdates.map((birthdate, idx) => (
+          <Box key={idx} display="flex" gap={1} alignItems="center" mt={1}>
+            <TextField
+              label={`Birthdate ${birthdates.length > 1 ? idx + 1 : ''}`}
+              type="date"
+              fullWidth
+              margin="normal"
+              InputLabelProps={{ shrink: true }}
+              value={birthdate}
+              onChange={e => handleArrayChange(setBirthdates, birthdates, idx, e.target.value)}
+            />
+            {birthdates.length > 1 && (
+              <Button color="error" onClick={() => handleRemoveField(setBirthdates, birthdates, idx)}>-</Button>
+            )}
+            {idx === birthdates.length - 1 && (
+              <Button onClick={() => handleAddField(setBirthdates, birthdates)}>+</Button>
+            )}
+          </Box>
+        ))}
+
+        {/* Multiple Ages */}
+        {ages.map((age, idx) => (
+          <Box key={idx} display="flex" gap={1} alignItems="center" mt={1}>
+            <TextField
+              label={`Age ${ages.length > 1 ? idx + 1 : ''}`}
+              type="number"
+              fullWidth
+              margin="normal"
+              value={age}
+              onChange={e => handleArrayChange(setAges, ages, idx, e.target.value)}
+            />
+            {ages.length > 1 && (
+              <Button color="error" onClick={() => handleRemoveField(setAges, ages, idx)}>-</Button>
+            )}
+            {idx === ages.length - 1 && (
+              <Button onClick={() => handleAddField(setAges, ages)}>+</Button>
+            )}
+          </Box>
+        ))}
+
+        {/* Address */}
+        <TextField
+          label="Address"
+          fullWidth
+          margin="normal"
+          multiline
+          minRows={2}
+          value={address}
+          onChange={e => setAddress(e.target.value)}
+        />
+
+        {/* Image Upload (one or more, e.g., qrcode or profile images) */}
+        <Box mt={2} mb={2} display="flex" flexDirection="column" alignItems="center">
+          <input
+            accept="image/*"
+            style={{ display: 'none' }}
+            id="image-upload"
+            multiple
+            type="file"
+            onChange={handleImageChange}
           />
+          <label htmlFor="image-upload">
+            <Button variant="outlined" component="span" startIcon={<PhotoCamera />}>
+              Upload Image(s) (QR code, profile, etc.)
+            </Button>
+          </label>
+          <Box display="flex" gap={1} mt={1} flexWrap="wrap">
+            {imagePreviews.map((src, i) => (
+              <Avatar key={i} src={src} sx={{ width: 56, height: 56 }} />
+            ))}
+          </Box>
         </Box>
 
         <Button

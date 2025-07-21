@@ -15,8 +15,8 @@ import {
   InputLabel,
   FormControl,
   Box,
+  Link as MuiLink
 } from '@mui/material';
-import FinEdgeLogo from '@/app/components/FinEdgeLogo';
 
 // Pre-defined ITU country codes (add/remove as needed)
 const countryCodes = [
@@ -30,72 +30,20 @@ const countryCodes = [
   { code: '+86', label: 'China (+86)' },
 ];
 
-// Helper to decode base64 (browser-safe)
-function decodeBase64Json(line) {
+// Helper: Find a user in localStorage by username and password (for demo/offline)
+function findUserByUsernamePassword({ username, password }) {
+  // Look through all localStorage keys that start with "user:"
   try {
-    return JSON.parse(atob(line));
-  } catch {
-    return null;
-  }
-}
-
-// Helper for fetching and parsing public/user_data files
-async function findUserInPublicBackup({ username, phone, countryCode }) {
-  // 1. Try chamcha.json (plain JSON, newline separated)
-  try {
-    const res = await fetch('/user_data/chamcha.json');
-    if (res.ok) {
-      const text = await res.text();
-      const lines = text.split('\n').filter(Boolean);
-      for (const line of lines) {
-        let user;
-        try { user = JSON.parse(line); } catch { continue; }
-        if (
-          user.username === username &&
-          user.phone === phone &&
-          user.countryCode === countryCode
-        ) {
-          return user;
-        }
-      }
-    }
-  } catch {}
-  // 2. Try maja.txt, jhola.txt, bhola.txt (base64-encoded JSON, newline separated)
-  for (const file of ['maja.txt', 'jhola.txt', 'bhola.txt']) {
-    try {
-      const res = await fetch(`/user_data/${file}`);
-      if (res.ok) {
-        const text = await res.text();
-        const lines = text.split('\n').filter(Boolean);
-        for (const line of lines) {
-          const user = decodeBase64Json(line);
-          if (
-            user &&
-            user.username === username &&
-            user.phone === phone &&
-            user.countryCode === countryCode
-          ) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key.startsWith('user:')) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const user = JSON.parse(raw);
+          if (user.username === username && user.password === password) {
             return user;
           }
         }
-      }
-    } catch {}
-  }
-  return null;
-}
-
-// Helper: Try Redis-like localStorage for user
-function findUserInRedisLike({ username, phone, countryCode }) {
-  try {
-    const raw = localStorage.getItem(`user:${phone}`);
-    if (raw) {
-      const user = JSON.parse(raw);
-      if (
-        user.username === username &&
-        user.phone === phone &&
-        user.countryCode === countryCode
-      ) {
-        return user;
       }
     }
   } catch {}
@@ -104,176 +52,101 @@ function findUserInRedisLike({ username, phone, countryCode }) {
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
-  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [countryCode, setCountryCode] = useState(countryCodes[0].code);
+  const [phone, setPhone] = useState('');
+  const [emails, setEmails] = useState(['']);
+  const [names, setNames] = useState(['']);
+  const [birthdates, setBirthdates] = useState(['']);
+  const [ages, setAges] = useState(['']);
+  const [address, setAddress] = useState('');
+  const [imagePreviews, setImagePreviews] = useState([]);
   const [message, setMessage] = useState('');
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const router = useRouter();
 
-  // Optional: Allow some hardcoded users
-  const predefinedUsers = [
-    { username: 'Kamla', phone: '9999999999', countryCode: '+91' },
-    { username: 'Rohan', phone: '8888888888', countryCode: '+91' },
-  ];
+  // Dynamic fields helpers
+  const handleArrayChange = (setter, arr, idx, value) => {
+    const newArr = [...arr];
+    newArr[idx] = value;
+    setter(newArr);
+  };
+  const handleAddField = (setter, arr) => {
+    setter([...arr, '']);
+  };
+  const handleRemoveField = (setter, arr, idx) => {
+    if (arr.length > 1) {
+      const newArr = arr.slice();
+      newArr.splice(idx, 1);
+      setter(newArr);
+    }
+  };
 
-  // Helper: Try Redis API if Mongo fails
-  async function tryRedisLogin({ username, phone, countryCode }) {
-    try {
-      const res = await fetch('/api/auth/redis-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, phone, countryCode }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        return data;
-      }
-    } catch {}
-    return null;
-  }
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files.length) {
+      const files = Array.from(e.target.files);
+      setImagePreviews(files.map(file => URL.createObjectURL(file)));
+    }
+  };
 
   const handleLogin = async () => {
-    // 1. Check against predefined users (optional)
-    for (const user of predefinedUsers) {
-      if (
-        user.phone === phone &&
-        user.username === username &&
-        user.countryCode === countryCode
-      ) {
-        localStorage.setItem('loggedIn', 'true');
-        sessionStorage.setItem('username', user.username);
-        sessionStorage.setItem('phone', user.phone);
-        sessionStorage.setItem('countryCode', user.countryCode);
-        // Demo bank details for hardcoded users
-        sessionStorage.setItem('bank', 'Demo Bank');
-        sessionStorage.setItem('accountNumber', '1234567890');
-        sessionStorage.setItem('debitCardNumber', '1234567890123456');
-        router.push('/otp');
-        return;
-      }
+    if (!username.trim()) {
+      setMessage('Please enter your username.');
+      setOpenSnackbar(true);
+      return;
+    }
+    if (!password) {
+      setMessage('Please enter your password.');
+      setOpenSnackbar(true);
+      return;
     }
 
-    // 2. Backend authentication (using username, phone, and countryCode)
+    // 1. Backend authentication (using username, password)
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, phone, countryCode }),
+        body: JSON.stringify({ username, password }),
       });
 
       const data = await res.json();
 
-      if (!res.ok || !data.success) {
-        // If MongoDB unreachable/fails, try Redis
-        if (data.message && data.message.toLowerCase().includes('mongo')) {
-          const redisData = await tryRedisLogin({ username, phone, countryCode });
-          if (redisData) {
-            localStorage.setItem('loggedIn', 'true');
-            sessionStorage.setItem('username', redisData.username);
-            sessionStorage.setItem('phone', redisData.phone);
-            sessionStorage.setItem('countryCode', redisData.countryCode);
-            if (redisData.bank) sessionStorage.setItem('bank', redisData.bank);
-            if (redisData.accountNumber) sessionStorage.setItem('accountNumber', redisData.accountNumber);
-            if (redisData.debitCardNumber) sessionStorage.setItem('debitCardNumber', redisData.debitCardNumber);
-            router.push('/otp');
-            return;
-          }
-        }
+      if (res.ok && data.success) {
+        // Login success
+        localStorage.setItem('loggedIn', 'true');
+        sessionStorage.setItem('username', data.username);
+        router.push('/otp');
+        return;
+      } else {
         throw new Error(data.message || 'Login failed');
       }
-
-      localStorage.setItem('loggedIn', 'true');
-      sessionStorage.setItem('username', data.username);
-      sessionStorage.setItem('phone', data.phone);
-      sessionStorage.setItem('countryCode', data.countryCode);
-      if (data.bank) sessionStorage.setItem('bank', data.bank);
-      if (data.accountNumber) sessionStorage.setItem('accountNumber', data.accountNumber);
-      if (data.debitCardNumber) sessionStorage.setItem('debitCardNumber', data.debitCardNumber);
-      router.push('/otp');
     } catch (err) {
-      // 3. Try Redis-like localStorage
-      const redisLikeUser = findUserInRedisLike({ username, phone, countryCode });
-      if (redisLikeUser) {
-        sessionStorage.setItem('username', redisLikeUser.username);
-        sessionStorage.setItem('phone', redisLikeUser.phone);
-        sessionStorage.setItem('countryCode', redisLikeUser.countryCode);
-        sessionStorage.setItem('bank', redisLikeUser.bank || 'icici Bank');
-        sessionStorage.setItem('accountNumber', redisLikeUser.accountNumber || '1234567890');
-        sessionStorage.setItem('debitCardNumber', redisLikeUser.debitCardNumber || '1234567890123456');
+      // 2. Fallback to localStorage
+      const user = findUserByUsernamePassword({ username, password });
+      if (user) {
+        sessionStorage.setItem('username', user.username);
         localStorage.setItem('loggedIn', 'true');
         router.push('/otp');
         return;
       }
-
-      // 4. Offline fallback: check chamcha.json or localStorage (username, phone, countryCode)
-      try {
-        if (typeof window !== 'undefined') {
-          const raw = localStorage.getItem('chamcha.json');
-          let offlineUser = null;
-          if (raw) {
-            try {
-              offlineUser = JSON.parse(raw);
-            } catch {
-              offlineUser = {};
-            }
-          }
-
-          if (
-            offlineUser &&
-            offlineUser.phone === phone &&
-            offlineUser.username === username &&
-            offlineUser.countryCode === countryCode
-          ) {
-            sessionStorage.setItem('username', username);
-            sessionStorage.setItem('phone', phone);
-            sessionStorage.setItem('countryCode', countryCode);
-            // fallback bank details for offline
-            sessionStorage.setItem('bank', offlineUser.bank || 'icici Bank');
-            sessionStorage.setItem('accountNumber', offlineUser.accountNumber || '1234567890');
-            sessionStorage.setItem('debitCardNumber', offlineUser.debitCardNumber || '1234567890123456');
-            localStorage.setItem('loggedIn', 'true');
-            router.push('/otp');
-            return;
-          }
-        }
-
-        // 5. Try public/user_data backups (fetch from public folder)
-        const backupUser = await findUserInPublicBackup({ username, phone, countryCode });
-        if (backupUser) {
-          sessionStorage.setItem('username', backupUser.username);
-          sessionStorage.setItem('phone', backupUser.phone);
-          sessionStorage.setItem('countryCode', backupUser.countryCode);
-          sessionStorage.setItem('bank', backupUser.bank || 'icici Bank');
-          sessionStorage.setItem('accountNumber', backupUser.accountNumber || '1234567890');
-          sessionStorage.setItem('debitCardNumber', backupUser.debitCardNumber || '1234567890123456');
-          localStorage.setItem('loggedIn', 'true');
-          router.push('/otp');
-          return;
-        }
-
-        setMessage('Server unreachable and no matching user found.');
-        setOpenSnackbar(true);
-      } catch (fallbackErr) {
-        setMessage('Offline login failed. Try again later.');
-        setOpenSnackbar(true);
-      }
+      setMessage('Login failed. Please check your credentials.');
+      setOpenSnackbar(true);
     }
   };
 
   return (
     <Container
-      maxWidth="xs"
+      maxWidth="sm"
       style={{
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        height: '100vh',
+        minHeight: '100vh',
         padding: '1rem',
         position: 'relative',
       }}
     >
-      <FinEdgeLogo />
       <Paper
         elevation={3}
         style={{ padding: '2rem', width: '100%', textAlign: 'center' }}
@@ -290,34 +163,174 @@ export default function LoginPage() {
           onChange={(e) => setUsername(e.target.value)}
           required
         />
+        <Box textAlign="left" ml={0.5}>
+          <MuiLink
+            href="/otp"
+            underline="hover"
+            sx={{ fontSize: '0.95rem', cursor: 'pointer' }}
+          >
+            Forgot username?
+          </MuiLink>
+        </Box>
 
-        <Box display="flex" gap={1} alignItems="center">
-          <FormControl sx={{ minWidth: 100 }}>
-            <InputLabel id="country-code-label">Code</InputLabel>
-            <Select
-              labelId="country-code-label"
-              id="country-code"
-              value={countryCode}
-              label="Code"
-              onChange={e => setCountryCode(e.target.value)}
-              size="small"
-            >
-              {countryCodes.map((option) => (
-                <MenuItem value={option.code} key={option.code}>{option.label}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        <TextField
+          label="Password"
+          type="password"
+          fullWidth
+          margin="normal"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <Box textAlign="left" ml={0.5}>
+          <MuiLink
+            href="/otp"
+            underline="hover"
+            sx={{ fontSize: '0.95rem', cursor: 'pointer' }}
+          >
+            Forgot password?
+          </MuiLink>
+        </Box>
 
-          <TextField
-            label="Phone Number"
-            type="tel"
-            fullWidth
-            margin="normal"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/, ''))}
-            required
-            sx={{ flex: 1 }}
+        {/* Multiple Names (display only, optional) */}
+        {names.map((name, idx) => (
+          <Box key={idx} display="flex" gap={1} alignItems="center" mt={1}>
+            <TextField
+              label={`Name ${names.length > 1 ? idx + 1 : ''}`}
+              fullWidth
+              margin="normal"
+              value={name}
+              onChange={e => handleArrayChange(setNames, names, idx, e.target.value)}
+            />
+            {names.length > 1 && (
+              <Button color="error" onClick={() => handleRemoveField(setNames, names, idx)}>-</Button>
+            )}
+            {idx === names.length - 1 && (
+              <Button onClick={() => handleAddField(setNames, names)}>+</Button>
+            )}
+          </Box>
+        ))}
+
+        {/* Multiple Phone Numbers */}
+        <Box display="flex" flexDirection="column" gap={1}>
+          <Box display="flex" gap={1} alignItems="center" mt={1}>
+            <FormControl sx={{ minWidth: 100 }}>
+              <InputLabel id="country-code-label">Code</InputLabel>
+              <Select
+                labelId="country-code-label"
+                id="country-code"
+                value={countryCode}
+                label="Code"
+                onChange={e => setCountryCode(e.target.value)}
+                size="small"
+              >
+                {countryCodes.map((option) => (
+                  <MenuItem value={option.code} key={option.code}>{option.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Phone Number"
+              fullWidth
+              margin="normal"
+              value={phone}
+              onChange={e => setPhone(e.target.value.replace(/\D/, ''))}
+              sx={{ flex: 1 }}
+            />
+          </Box>
+        </Box>
+
+        {/* Multiple Emails */}
+        {emails.map((email, idx) => (
+          <Box key={idx} display="flex" gap={1} alignItems="center" mt={1}>
+            <TextField
+              label={`Email ${emails.length > 1 ? idx + 1 : ''}`}
+              fullWidth
+              margin="normal"
+              value={email}
+              onChange={e => handleArrayChange(setEmails, emails, idx, e.target.value)}
+            />
+            {emails.length > 1 && (
+              <Button color="error" onClick={() => handleRemoveField(setEmails, emails, idx)}>-</Button>
+            )}
+            {idx === emails.length - 1 && (
+              <Button onClick={() => handleAddField(setEmails, emails)}>+</Button>
+            )}
+          </Box>
+        ))}
+
+        {/* Multiple Birthdates */}
+        {birthdates.map((birthdate, idx) => (
+          <Box key={idx} display="flex" gap={1} alignItems="center" mt={1}>
+            <TextField
+              label={`Birthdate ${birthdates.length > 1 ? idx + 1 : ''}`}
+              type="date"
+              fullWidth
+              margin="normal"
+              InputLabelProps={{ shrink: true }}
+              value={birthdate}
+              onChange={e => handleArrayChange(setBirthdates, birthdates, idx, e.target.value)}
+            />
+            {birthdates.length > 1 && (
+              <Button color="error" onClick={() => handleRemoveField(setBirthdates, birthdates, idx)}>-</Button>
+            )}
+            {idx === birthdates.length - 1 && (
+              <Button onClick={() => handleAddField(setBirthdates, birthdates)}>+</Button>
+            )}
+          </Box>
+        ))}
+
+        {/* Multiple Ages */}
+        {ages.map((age, idx) => (
+          <Box key={idx} display="flex" gap={1} alignItems="center" mt={1}>
+            <TextField
+              label={`Age ${ages.length > 1 ? idx + 1 : ''}`}
+              type="number"
+              fullWidth
+              margin="normal"
+              value={age}
+              onChange={e => handleArrayChange(setAges, ages, idx, e.target.value)}
+            />
+            {ages.length > 1 && (
+              <Button color="error" onClick={() => handleRemoveField(setAges, ages, idx)}>-</Button>
+            )}
+            {idx === ages.length - 1 && (
+              <Button onClick={() => handleAddField(setAges, ages)}>+</Button>
+            )}
+          </Box>
+        ))}
+
+        {/* Address */}
+        <TextField
+          label="Address"
+          fullWidth
+          margin="normal"
+          multiline
+          minRows={2}
+          value={address}
+          onChange={e => setAddress(e.target.value)}
+        />
+
+        {/* Image Upload (one or more, e.g., qrcode or profile images) */}
+        <Box mt={2} mb={2} display="flex" flexDirection="column" alignItems="center">
+          <input
+            accept="image/*"
+            style={{ display: 'none' }}
+            id="image-upload"
+            multiple
+            type="file"
+            onChange={handleImageChange}
           />
+          <label htmlFor="image-upload">
+            <Button variant="outlined" component="span">
+              Upload Image(s) (QR code, profile, etc.)
+            </Button>
+          </label>
+          <Box display="flex" gap={1} mt={1} flexWrap="wrap">
+            {imagePreviews.map((src, i) => (
+              <img key={i} src={src} alt="preview" width={56} height={56} style={{ borderRadius: 8 }} />
+            ))}
+          </Box>
         </Box>
 
         <Button
@@ -338,21 +351,6 @@ export default function LoginPage() {
       >
         <Alert severity="error">{message}</Alert>
       </Snackbar>
-
-      {/* 🔒 Hidden admin link */}
-      <div
-        title="Please"
-        onClick={() => router.push('/secret')}
-        style={{
-          width: '10px',
-          height: '10px',
-          backgroundColor: 'transparent',
-          position: 'absolute',
-          bottom: '5px',
-          right: '5px',
-          cursor: 'pointer',
-        }}
-      />
     </Container>
   );
 }

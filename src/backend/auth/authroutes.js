@@ -1,40 +1,18 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import  {dbConnect, getUser, saveUser } from '../utils/dbConnect.js';
+import { dbConnect, getUser, saveUser } from '../utils/dbConnect.js';
 
 const router = express.Router();
 
-const banks = ['SBI', 'HDFC', 'ICICI', 'AXIS'];
-const countryCodes = ['+91', '+1', '+44', '+81', '+61', '+49', '+971', '+86'];
-
-function generateAccountNumber() {
-  return Math.floor(1000000000 + Math.random() * 9000000000).toString();
-}
-function generateDebitCardNumber() {
-  return Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
-}
-
-// Optional: Backup user data to user_data folder (for redundancy)
-function encodeBase64(data) {
-  return Buffer.from(data, 'utf-8').toString('base64');
-}
+// Utility functions...
+function encodeBase64(data) { return Buffer.from(data, 'utf-8').toString('base64'); }
 function backupUserData(userData) {
-  const backupObj = {
-    username: userData.username,
-    phone: userData.phone,
-    countryCode: userData.countryCode,
-    bank: userData.bank,
-    accountNumber: userData.accountNumber,
-    debitCardNumber: userData.debitCardNumber,
-    createdAt: new Date().toISOString()
-  };
+  const backupObj = { ...userData, createdAt: new Date().toISOString() };
   const backupStr = JSON.stringify(backupObj, null, 2);
   const encoded = encodeBase64(backupStr);
-
   const backupDir = path.join(process.cwd(), 'public', 'user_data');
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-
   fs.appendFileSync(path.join(backupDir, 'chamcha.json'), backupStr + '\n', 'utf-8');
   fs.appendFileSync(path.join(backupDir, 'maja.txt'), encoded + '\n', 'utf-8');
   fs.appendFileSync(path.join(backupDir, 'bhola.txt'), encoded + '\n', 'utf-8');
@@ -43,31 +21,35 @@ function backupUserData(userData) {
 
 // Signup Route
 router.post('/signup', async (req, res) => {
-  const { username, phone, countryCode } = req.body;
   try {
-    // Validation
-    if (!username || !phone || !countryCode) {
-      return res.status(400).json({ message: 'All fields are required' });
+    const {
+      username, password, address, members
+    } = req.body;
+
+    // Basic validation
+    if (!username || !password || !Array.isArray(members) || members.length === 0) {
+      return res.status(400).json({ message: 'Missing required fields: username, password, members (at least 1)' });
     }
-    if (!countryCodes.includes(countryCode)) {
-      return res.status(400).json({ message: 'Invalid country code' });
-    }
-    if (!/^\d{10}$/.test(phone)) {
-      return res.status(400).json({ message: 'Phone number must be a valid 10-digit number' });
+    for (const member of members) {
+      if (!member.name) return res.status(400).json({ message: 'Each member must have a name' });
     }
 
-    await dbConnect(); // ensure at least one backend is ready
+    await dbConnect();
 
-    let user = await getUser({ phone });
+    let user = await getUser({ username });
     if (user) {
-      return res.status(400).json({ message: 'User with this phone already exists' });
+      return res.status(400).json({ message: 'User with this username already exists' });
     }
 
-    const bank = banks[Math.floor(Math.random() * banks.length)];
-    const accountNumber = generateAccountNumber();
-    const debitCardNumber = generateDebitCardNumber();
+    // No accountNumber or debitCardNumber generation here
 
-    const userData = { username, phone, countryCode, bank, accountNumber, debitCardNumber };
+    const userData = {
+      username,
+      password, // hash before saving in production!
+      address,
+      linked: false,
+      members
+    };
 
     user = await saveUser(userData);
 
@@ -75,12 +57,7 @@ router.post('/signup', async (req, res) => {
 
     res.status(201).json({
       message: 'User registered successfully',
-      username: user.username,
-      phone: user.phone,
-      countryCode: user.countryCode,
-      bank: user.bank,
-      accountNumber: user.accountNumber,
-      debitCardNumber: user.debitCardNumber
+      ...userData
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -88,29 +65,25 @@ router.post('/signup', async (req, res) => {
   }
 });
 
-// Login Route
+// Login Route (username + password only)
 router.post('/login', async (req, res) => {
-  const { username, phone } = req.body;
   try {
-    if (!username || !phone) {
-      return res.status(400).json({ message: 'Username and phone are required' });
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
     }
-
     await dbConnect();
-
-    let user = await getUser({ phone, username });
+    let user = await getUser({ username });
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-
+    // Compare password (in production, use bcrypt)
+    if (user.password !== password) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
     res.status(200).json({
       message: 'Login successful',
-      username: user.username,
-      phone: user.phone,
-      countryCode: user.countryCode,
-      bank: user.bank,
-      accountNumber: user.accountNumber,
-      debitCardNumber: user.debitCardNumber
+      ...user._doc // expose all user info except password in real world
     });
   } catch (error) {
     console.error('Login error:', error);
