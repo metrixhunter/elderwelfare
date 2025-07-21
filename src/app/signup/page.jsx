@@ -1,5 +1,5 @@
 'use client';
-
+import { HeaderFooterWrapper } from '../layout';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {

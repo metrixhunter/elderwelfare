@@ -17,7 +17,7 @@ const exploreOptions = [
 ];
 
 const getInvolvedOptions = [
-  { label: "Volunteer", href: "/volunteer" },
+  { label: "Volunteer", href: "/signup" }, // Volunteer now goes to signup page
   { label: "Donate", href: "/donate" },
   { label: "Share Your Story", href: "/stories" },
 ];
@@ -27,17 +27,17 @@ const footerLinks = [
   {
     title: "Explore",
     links: [
-      { label: "Care Services", href: "/care-services" },
-      { label: "Health & Wellness", href: "/health-wellness" },
-      { label: "Community Support", href: "/community" },
-      { label: "Legal & Financial Help", href: "/legal-financial" },
-      { label: "Resources", href: "/resources" }
+      { label: "Care Services", href: "/budgeting" },
+      { label: "Health & Wellness", href: "/credit" },
+      { label: "Community Support", href: "/saving" },
+      { label: "Legal & Financial Help", href: "/safety" },
+      { label: "Resources", href: "/investment" }
     ]
   },
   {
     title: "Get Involved",
     links: [
-      { label: "Volunteer", href: "/volunteer" },
+      { label: "Volunteer", href: "/signup" }, // Volunteer now goes to signup page
       { label: "Donate", href: "/donate" },
       { label: "Share Your Story", href: "/stories" }
     ]
@@ -61,11 +61,16 @@ const footerLinks = [
 
 // Pages where the header/footer should appear
 const mainHeaderPages = [
-  '/', '/care-services', '/health-wellness', '/community', '/legal-financial', '/resources'
+  '/',
+  '/budgeting',
+  '/credit',
+  '/saving',
+  '/safety',
+  '/investment'
 ];
 const showFooterPages = mainHeaderPages;
 
-export default function Layout({ children }) {
+export function HeaderFooterWrapper({ children }) {
   const pathname = usePathname();
   const showHeader = mainHeaderPages.includes(pathname);
   const showFooter = showFooterPages.includes(pathname);
@@ -75,121 +80,128 @@ export default function Layout({ children }) {
   const [involvedAnchor, setInvolvedAnchor] = useState(null);
 
   return (
+    <>
+      {showHeader && (
+        <Box
+          sx={{
+            width: '100%',
+            px: 4,
+            py: 2,
+            bgcolor: "#fff",
+            boxShadow: '0 2px 8px 0 #0001',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+            {/* Logo and Name */}
+            <Typography variant="h5" sx={{
+              color: "#2E7D32",
+              fontWeight: 700,
+              fontFamily: "inherit",
+              letterSpacing: 1,
+              mr: 3
+            }}>
+              <span role="img" aria-label="care" style={{ marginRight: 8 }}>🤝</span>
+              ElderWelfare
+            </Typography>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Button
+                color="primary"
+                endIcon={<ExpandMoreIcon />}
+                onClick={e => setExploreAnchor(e.currentTarget)}
+                sx={{ textTransform: "none", fontWeight: 600 }}
+              >
+                Explore
+              </Button>
+              <Popover
+                open={Boolean(exploreAnchor)}
+                anchorEl={exploreAnchor}
+                onClose={() => setExploreAnchor(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+              >
+                <Box sx={{ p: 1 }}>
+                  {exploreOptions.map(opt =>
+                    <Button
+                      key={opt.label}
+                      href={opt.href}
+                      component={Link}
+                      fullWidth
+                      sx={{ justifyContent: "flex-start", fontWeight: 500 }}
+                      onClick={() => setExploreAnchor(null)}
+                    >
+                      {opt.label}
+                    </Button>
+                  )}
+                </Box>
+              </Popover>
+              <Button
+                color="primary"
+                endIcon={<ExpandMoreIcon />}
+                onClick={e => setInvolvedAnchor(e.currentTarget)}
+                sx={{ textTransform: "none", fontWeight: 600 }}
+              >
+                Get Involved
+              </Button>
+              <Popover
+                open={Boolean(involvedAnchor)}
+                anchorEl={involvedAnchor}
+                onClose={() => setInvolvedAnchor(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+              >
+                <Box sx={{ p: 1 }}>
+                  {getInvolvedOptions.map(opt =>
+                    <Button
+                      key={opt.label}
+                      href={opt.href}
+                      component={Link}
+                      fullWidth
+                      sx={{ justifyContent: "flex-start", fontWeight: 500 }}
+                      onClick={() => setInvolvedAnchor(null)}
+                    >
+                      {opt.label}
+                    </Button>
+                  )}
+                </Box>
+              </Popover>
+              <Button color="primary" href="/about" sx={{ textTransform: "none", fontWeight: 600 }}>
+                About
+              </Button>
+              <Button color="primary" href="/contact" sx={{ textTransform: "none", fontWeight: 600 }}>
+                Contact
+              </Button>
+            </Box>
+          </Box>
+          {/* Auth buttons on home page */}
+          {pathname === '/' && (
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Button variant="text" href="/login" sx={{ fontWeight: 500 }}>LOGIN</Button>
+              <Button variant="contained" color="secondary" href="/signup" sx={{ fontWeight: 600 }}>SIGNUP</Button>
+            </Box>
+          )}
+        </Box>
+      )}
+      {children}
+      {showFooter && <FooterElderWelfare />}
+    </>
+  );
+}
+
+export default function Layout({ children }) {
+  const pathname = usePathname();
+  return (
     <html lang="en">
       <body style={{ background: "#f7fafc" }}>
-        {/* HEADER: on main + elder welfare pages */}
-        {showHeader && (
-          <Box
-            sx={{
-              width: '100%',
-              px: 4,
-              py: 2,
-              bgcolor: "#fff",
-              boxShadow: '0 2px 8px 0 #0001',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              position: 'sticky',
-              top: 0,
-              zIndex: 100
-            }}
-          >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
-              {/* Logo and Name */}
-              <Typography variant="h5" sx={{
-                color: "#2E7D32",
-                fontWeight: 700,
-                fontFamily: "inherit",
-                letterSpacing: 1,
-                mr: 3
-              }}>
-                <span role="img" aria-label="care" style={{ marginRight: 8 }}>🤝</span>
-                ElderWelfare
-              </Typography>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <Button
-                  color="primary"
-                  endIcon={<ExpandMoreIcon />}
-                  onClick={e => setExploreAnchor(e.currentTarget)}
-                  sx={{ textTransform: "none", fontWeight: 600 }}
-                >
-                  Explore
-                </Button>
-                <Popover
-                  open={Boolean(exploreAnchor)}
-                  anchorEl={exploreAnchor}
-                  onClose={() => setExploreAnchor(null)}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-                >
-                  <Box sx={{ p: 1 }}>
-                    {exploreOptions.map(opt =>
-                      <Button
-                        key={opt.label}
-                        href={opt.href}
-                        component={Link}
-                        fullWidth
-                        sx={{ justifyContent: "flex-start", fontWeight: 500 }}
-                        onClick={() => setExploreAnchor(null)}
-                      >
-                        {opt.label}
-                      </Button>
-                    )}
-                  </Box>
-                </Popover>
-                <Button
-                  color="primary"
-                  endIcon={<ExpandMoreIcon />}
-                  onClick={e => setInvolvedAnchor(e.currentTarget)}
-                  sx={{ textTransform: "none", fontWeight: 600 }}
-                >
-                  Get Involved
-                </Button>
-                <Popover
-                  open={Boolean(involvedAnchor)}
-                  anchorEl={involvedAnchor}
-                  onClose={() => setInvolvedAnchor(null)}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-                >
-                  <Box sx={{ p: 1 }}>
-                    {getInvolvedOptions.map(opt =>
-                      <Button
-                        key={opt.label}
-                        href={opt.href}
-                        component={Link}
-                        fullWidth
-                        sx={{ justifyContent: "flex-start", fontWeight: 500 }}
-                        onClick={() => setInvolvedAnchor(null)}
-                      >
-                        {opt.label}
-                      </Button>
-                    )}
-                  </Box>
-                </Popover>
-                <Button color="primary" href="/about" sx={{ textTransform: "none", fontWeight: 600 }}>
-                  About
-                </Button>
-                <Button color="primary" href="/contact" sx={{ textTransform: "none", fontWeight: 600 }}>
-                  Contact
-                </Button>
-              </Box>
-            </Box>
-            {/* Auth buttons on home page */}
-            {pathname === '/' && (
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <Button variant="text" href="/login" sx={{ fontWeight: 500 }}>LOGIN</Button>
-                <Button variant="contained" color="secondary" href="/signup" sx={{ fontWeight: 600 }}>SIGNUP</Button>
-              </Box>
-            )}
-          </Box>
-        )}
         {/* MAIN CONTENT */}
         <main style={{ minHeight: "70vh" }}>
-          {pathname === '/' ? <MainPageContent /> : children}
+          {pathname === '/' ? <MainPageContent /> : <HeaderFooterWrapper>{children}</HeaderFooterWrapper>}
         </main>
-        {/* FOOTER: on main and all elder welfare pages */}
-        {showFooter && <FooterElderWelfare />}
       </body>
     </html>
   );
@@ -197,67 +209,69 @@ export default function Layout({ children }) {
 
 function MainPageContent() {
   return (
-    <Box sx={{ position: "relative", minHeight: "70vh", px: 0 }}>
-      <Box sx={{
-        display: "flex",
-        flexDirection: { xs: "column", md: "row" },
-        alignItems: "flex-end",
-        justifyContent: "space-between",
-        width: "100%",
-        minHeight: 320,
-        px: { xs: 2, md: 8 },
-        pt: 6,
-        background: "url('/images/elder-hero.png') center/cover no-repeat, linear-gradient(to bottom, #e8f5e9 70%, #2E7D32 100%)",
-        position: "relative"
-      }}>
-        <Box sx={{ maxWidth: 480, pb: 5 }}>
-          <Typography variant="h3" sx={{ color: "white", fontWeight: 800, mb: 1, textAlign: "left" }}>
-            Welcome to ElderWelfare
-          </Typography>
-          <Typography variant="h6" color="grey.300" sx={{ mb: 2, textAlign: "left" }}>
-            Caring for elders. Building dignity, community, and support—for today and tomorrow.
-          </Typography>
-          <Paper elevation={3} sx={{ p: 3, mt: 2, textAlign: 'left', borderRadius: 3, background: "#fff8" }}>
-            <Typography paragraph sx={{ mb: 1 }}>
-              <b>ElderWelfare</b> is your platform for elder care and mutual support. By caring for elders now, you help build a community where everyone is supported—now and in the future.
+    <HeaderFooterWrapper>
+      <Box sx={{ position: "relative", minHeight: "70vh", px: 0 }}>
+        <Box sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          width: "100%",
+          minHeight: 320,
+          px: { xs: 2, md: 8 },
+          pt: 6,
+          background: "url('/images/elder-hero.png') center/cover no-repeat, linear-gradient(to bottom, #e8f5e9 70%, #2E7D32 100%)",
+          position: "relative"
+        }}>
+          <Box sx={{ maxWidth: 480, pb: 5 }}>
+            <Typography variant="h3" sx={{ color: "white", fontWeight: 800, mb: 1, textAlign: "left" }}>
+              Welcome to ElderWelfare
             </Typography>
-            <Typography paragraph sx={{ mb: 1 }}>
-              <b>What We Offer:</b>
+            <Typography variant="h6" color="grey.300" sx={{ mb: 2, textAlign: "left" }}>
+              Caring for elders. Building dignity, community, and support—for today and tomorrow.
             </Typography>
-            <Box component="ul" sx={{ pl: 4 }}>
-              <li>Care services: health, home, wellness, and companionship</li>
-              <li>Legal and financial help for elders</li>
-              <li>Community and volunteer support</li>
-              <li>Resource library for guides and assistance</li>
-              <li>Share your story—be part of our caring community!</li>
-            </Box>
-            <Typography paragraph sx={{ mt: 2 }}>
-              <b>Get started by exploring our services, joining our volunteer program, or accessing resources—from the header buttons above.</b>
-            </Typography>
-          </Paper>
-        </Box>
-        {/* Eldercare-themed image */}
-        <Box sx={{ flex: 1, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-          <Box sx={{
-            width: 0,
-            height: 0,
-            background: "",
-            borderRadius: 24,
-            boxShadow: '0 6px 36px #0002',
-            position: "relative",
-            overflow: "hidden"
-          }}>
-            {/* Replace with your own image */}
+            <Paper elevation={3} sx={{ p: 3, mt: 2, textAlign: 'left', borderRadius: 3, background: "#fff8" }}>
+              <Typography paragraph sx={{ mb: 1 }}>
+                <b>ElderWelfare</b> is your platform for elder care and mutual support. By caring for elders now, you help build a community where everyone is supported—now and in the future.
+              </Typography>
+              <Typography paragraph sx={{ mb: 1 }}>
+                <b>What We Offer:</b>
+              </Typography>
+              <Box component="ul" sx={{ pl: 4 }}>
+                <li>Care services: health, home, wellness, and companionship</li>
+                <li>Legal and financial help for elders</li>
+                <li>Community and volunteer support</li>
+                <li>Resource library for guides and assistance</li>
+                <li>Share your story—be part of our caring community!</li>
+              </Box>
+              <Typography paragraph sx={{ mt: 2 }}>
+                <b>Get started by exploring our services, joining our volunteer program, or accessing resources—from the header buttons above.</b>
+              </Typography>
+            </Paper>
+          </Box>
+          {/* Eldercare-themed image */}
+          <Box sx={{ flex: 1, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
             <Box sx={{
-              position: "absolute",
-              left: 0, bottom: 0, width: "100%", height: "60%",
-              background: "url('/images/elder-hero.png') center/cover no-repeat, linear-gradient(to bottom, #e8f5e9 70%, #2E7D32 100%)"
-            }} />
+              width: 0,
+              height: 0,
+              background: "",
+              borderRadius: 24,
+              boxShadow: '0 6px 36px #0002',
+              position: "relative",
+              overflow: "hidden"
+            }}>
+              {/* Replace with your own image */}
+              <Box sx={{
+                position: "absolute",
+                left: 0, bottom: 0, width: "100%", height: "60%",
+                background: "url('/images/elder-hero.png') center/cover no-repeat, linear-gradient(to bottom, #e8f5e9 70%, #2E7D32 100%)"
+              }} />
+            </Box>
           </Box>
         </Box>
+        {/* Add more features and testimonials below as needed */}
       </Box>
-      {/* Add more features and testimonials below as needed */}
-    </Box>
+    </HeaderFooterWrapper>
   );
 }
 
