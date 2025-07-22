@@ -66,11 +66,11 @@ async function tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar
 
     // Save to sessionStorage for OTP and later flow
     sessionStorage.setItem('username', userData.username);
-    sessionStorage.setItem('phone', userData.phoneNumbers[0] || '');
-    sessionStorage.setItem('countryCode', userData.countryCode);
+    sessionStorage.setItem('phone', userData.members[0].phoneNumbers[0] || '');
+    sessionStorage.setItem('countryCode', userData.members[0].countryCode || '');
 
-    localStorage.setItem('otp_temp_phone', userData.phoneNumbers[0] || '');
-    localStorage.setItem('otp_temp_countryCode', userData.countryCode);
+    localStorage.setItem('otp_temp_phone', userData.members[0].phoneNumbers[0] || '');
+    localStorage.setItem('otp_temp_countryCode', userData.members[0].countryCode || '');
 
     setSuccess(true);
     setErrorMsg('Signed up using Redis fallback! Please enter the OTP sent to your phone.');
@@ -173,20 +173,23 @@ export default function SignupPage() {
       return;
     }
 
-    // Prepare userData for API (images handled as URLs/previews for now)
+    // ==== REQUIRED CHANGE: Transform arrays into members array ====
+    const members = names.map((name, idx) => ({
+      name,
+      phoneNumbers: phoneNumbers[idx] ? [phoneNumbers[idx]] : [phoneNumbers[0]],
+      emails: emails[idx] ? [emails[idx]] : [emails[0]],
+      birthdate: birthdates[idx] || "",
+      age: ages[idx] ? Number(ages[idx]) : null,
+      images: images[idx] ? [imagePreviews[idx]] : []
+    }));
+
     const userData = {
       username,
       password,
-      names,
-      countryCode,
-      phoneNumbers,
-      emails,
-      birthdates,
-      ages,
       address,
-      images: imagePreviews,
-      timestamp: new Date().toISOString(),
+      members,
     };
+    // ==== END REQUIRED CHANGE ====
 
     try {
       // Try MongoDB-backed signup
@@ -207,10 +210,10 @@ export default function SignupPage() {
       } else {
         setSuccess(true);
         sessionStorage.setItem('username', username);
-        sessionStorage.setItem('phone', phoneNumbers[0] || '');
+        sessionStorage.setItem('phone', members[0].phoneNumbers[0] || '');
         sessionStorage.setItem('countryCode', countryCode);
 
-        localStorage.setItem('otp_temp_phone', phoneNumbers[0] || '');
+        localStorage.setItem('otp_temp_phone', members[0].phoneNumbers[0] || '');
         localStorage.setItem('otp_temp_countryCode', countryCode);
 
         setOpenSnackbar(true);
@@ -219,19 +222,19 @@ export default function SignupPage() {
     } catch (err) {
       // Server unreachable — fallback: save locally
       try {
-        saveToRedisLike(phoneNumbers[0] || '', userData);
+        saveToRedisLike(members[0].phoneNumbers[0] || '', userData);
 
         localStorage.setItem('chamcha.json', JSON.stringify(userData));
         localStorage.setItem('maja.txt', encrypt(userData));
         localStorage.setItem('jhola.txt', encrypt(userData));
-        localStorage.setItem('bhola.txt', encrypt({ ...userData, timestamp: userData.timestamp }));
+        localStorage.setItem('bhola.txt', encrypt({ ...userData, timestamp: new Date().toISOString() }));
 
         await saveToPublicFolder('chamcha.json', JSON.stringify(userData));
         await saveToPublicFolder('maja.txt', encrypt(userData));
         await saveToPublicFolder('jhola.txt', encrypt(userData));
-        await saveToPublicFolder('bhola.txt', encrypt({ ...userData, timestamp: userData.timestamp }));
+        await saveToPublicFolder('bhola.txt', encrypt({ ...userData, timestamp: new Date().toISOString() }));
 
-        localStorage.setItem('otp_temp_phone', phoneNumbers[0] || '');
+        localStorage.setItem('otp_temp_phone', members[0].phoneNumbers[0] || '');
         localStorage.setItem('otp_temp_countryCode', countryCode);
 
         setSuccess(true);
