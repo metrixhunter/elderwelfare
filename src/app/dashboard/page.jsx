@@ -11,7 +11,6 @@ import {
   IconButton,
   Box,
   Divider,
-  Drawer,
   List,
   ListItem,
   ListItemIcon,
@@ -20,9 +19,11 @@ import {
   useMediaQuery,
   BottomNavigation,
   BottomNavigationAction,
+  Avatar,
+  Checkbox,
+  TextField,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
@@ -36,16 +37,119 @@ import FlashOnIcon from '@mui/icons-material/FlashOn';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import LogoutIcon from '@mui/icons-material/Logout';
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
+import LocalPharmacyIcon from '@mui/icons-material/LocalPharmacy';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import MessageIcon from '@mui/icons-material/Message';
+import GroupIcon from '@mui/icons-material/Group';
 import { logout } from '@/app/logout/logout';
 import FeatureButton from '@/app/components/FeatureButton';
+
+const DEFAULT_QR_IMAGE = '/no-image-qr.png';
+
+const dummyUsers = [
+  // Simulated users for the dashboard preview
+  {
+    username: 'elder1',
+    age: 65,
+    countryCode: '+91',
+    phone: '9876543210',
+    email: 'elder1@mail.com',
+    medicalCondition: 'Diabetes',
+    qrCode: '/elder1-qr.png',
+    type: 'elder',
+  },
+  {
+    username: 'elder2',
+    age: 67,
+    countryCode: '+91',
+    phone: '9090909090',
+    email: 'elder2@mail.com',
+    medicalCondition: 'Hypertension',
+    qrCode: '',
+    type: 'elder',
+  },
+  {
+    username: 'youth1',
+    age: 32,
+    countryCode: '+91',
+    phone: '9123456789',
+    email: 'young1@mail.com',
+    type: 'youth',
+  },
+  {
+    username: 'youth2',
+    age: 22,
+    countryCode: '+91',
+    phone: '9000000000',
+    email: 'young2@mail.com',
+    type: 'youth',
+  },
+  {
+    username: 'elder3',
+    age: 70,
+    countryCode: '+91',
+    phone: '9999999999',
+    email: 'elder3@mail.com',
+    medicalCondition: 'Heart',
+    qrCode: '/elder3-qr.png',
+    type: 'elder',
+  },
+  {
+    username: 'youth3',
+    age: 28,
+    countryCode: '+91',
+    phone: '9333333333',
+    email: 'young3@mail.com',
+    type: 'youth',
+  },
+];
+
+function getRole(user) {
+  if (!user || !user.username) return null;
+  // Find yourself in dummyUsers
+  const current = dummyUsers.find(
+    u => u.username === user.username
+  );
+  if (!current) return null;
+  return current.age >= 55 ? 'elder' : 'youth';
+}
+
+function getOtherUsers(user) {
+  if (!user || !user.username) return [];
+  const current = dummyUsers.find(u => u.username === user.username);
+  if (!current) return [];
+  if (current.age >= 55) {
+    // Elder: show all youth (<55)
+    return dummyUsers
+      .filter(u => u.username !== user.username && u.age < 55)
+      .sort((a, b) => a.username.localeCompare(b.username));
+  } else {
+    // Youth: show all elders (>=55)
+    return dummyUsers
+      .filter(u => u.age >= 55)
+      .sort((a, b) => {
+        // Medical condition sorting, then age desc, then username
+        const medA = u.medicalCondition ? 0 : 1;
+        const medB = b.medicalCondition ? 0 : 1;
+        if (medA !== medB) return medA - medB;
+        if (b.age !== a.age) return b.age - a.age;
+        return a.username.localeCompare(b.username);
+      });
+  }
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
+  const [requests, setRequests] = useState({});
+  const [messages, setMessages] = useState({});
+  const [amounts, setAmounts] = useState({});
   const isDesktop = useMediaQuery('(min-width:960px)');
   const [bottomNavValue, setBottomNavValue] = useState(0);
 
+  // --- DO NOT MODIFY THIS STRIP ---
   useEffect(() => {
     let username = sessionStorage.getItem('username');
     let phone = sessionStorage.getItem('phone');
@@ -71,13 +175,13 @@ export default function DashboardPage() {
     }
     setUser({ username, phone, countryCode });
   }, [router]);
+  // --- DO NOT MODIFY THIS STRIP ---
 
   const handleLogout = () => {
     logout();
     router.push('/');
   };
 
-  // Actions for navigation
   const navItems = [
     { label: 'Scan', icon: <QrCodeScannerIcon />, href: '/scan' },
     { label: 'Send', icon: <PhoneAndroidIcon />, href: '/send-mobile' },
@@ -86,7 +190,6 @@ export default function DashboardPage() {
     { label: 'Help', icon: <HelpOutlineIcon />, href: '/support' },
   ];
 
-  // Sidebar links (desktop)
   const sidebarLinks = [
     { label: 'Dashboard', icon: <MenuIcon />, href: '/dashboard' },
     { label: 'Scan & Pay', icon: <QrCodeScannerIcon />, href: '/scan' },
@@ -104,10 +207,48 @@ export default function DashboardPage() {
     { label: 'Logout', icon: <LogoutIcon />, onClick: handleLogout },
   ];
 
+  // --- Community/organization predefined account ---
+  const orgAccount = {
+    username: 'elderwelfare_community',
+    email: 'org@elderwelfare.org',
+    phone: '1000000000',
+    countryCode: '+91',
+    age: 99,
+    type: 'org',
+  };
+
+  // --- Helpers for tickboxes ---
+  const handleRequestChange = (target, option) => (e) => {
+    setRequests(r => ({
+      ...r,
+      [target]: {
+        ...r[target],
+        [option]: e.target.checked,
+      },
+    }));
+  };
+  const handleMsgChange = (target) => (e) => {
+    setMessages(m => ({
+      ...m,
+      [target]: e.target.value,
+    }));
+  };
+  const handleAmountChange = (target) => (e) => {
+    setAmounts(a => ({
+      ...a,
+      [target]: e.target.value,
+    }));
+  };
+
+  // --- Role logic ---
+  const role = getRole(user);
+  const otherUsers = getOtherUsers(user);
+
+  // --- UI ---
+
   // Sidebar width (desktop)
   const sidebarWidth = sidebarOpen ? 240 : 56;
 
-  // Main Content
   return (
     <Box sx={{ bgcolor: '#f4f8fb', minHeight: '100vh', pb: { xs: 7, md: 4 } }}>
       {/* Fixed Logout Button (top right, always visible) */}
@@ -213,9 +354,10 @@ export default function DashboardPage() {
           justifyContent: 'flex-start',
           alignItems: 'center',
           pt: 3,
-          pb: { xs: 7, md: 4 }, // Leave space for bottom nav on mobile
+          pb: { xs: 7, md: 4 },
         }}
       >
+        {/* Welcome and Info */}
         {user && (
           <Typography variant="subtitle1" sx={{ mb: 2, color: '#1976d2', fontWeight: 500 }}>
             Welcome, {user.username}!
@@ -238,119 +380,200 @@ export default function DashboardPage() {
         >
           <FlashOnIcon sx={{ fontSize: 34, color: '#1976d2' }} />
           <Typography variant="body2" sx={{ flex: 1 }}>
-            <b>Lightning Fast Payments</b> &nbsp; | &nbsp; <b>100% Safe</b>
+            <b>Human-first. ElderWelfare Community.</b> | <b>100% Secure, Respectful &amp; Fast</b>
           </Typography>
         </Paper>
-        <Paper
-          elevation={3}
-          sx={{
-            width: '100%',
-            maxWidth: 480,
-            p: 3,
-            borderRadius: 3,
-            mb: 3,
-            bgcolor: '#fff',
-          }}
-        >
-          <Typography variant="h6" sx={{ mb: 2, color: '#1976d2', fontWeight: 600 }}>
-            Money Transfer
-          </Typography>
-          <Grid container spacing={2}>
-            {sidebarLinks
-              .filter(a =>
-                [
-                  'Scan & Pay',
-                  'To Mobile/Contact',
-                  'To Bank Account',
-                  'To Self Account',
-                  'Balance & History',
-                  'Check Balance',
-                  'Receive Money',
-                  'Help & Support',
-                ].includes(a.label)
-              )
-              .map((action, idx) => (
-                <Grid
-                  item
-                  xs={3}
-                  sm={2}
-                  md={2}
-                  key={action.label}
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}
-                >
-                  <FeatureButton icon={action.icon} label={action.label} href={action.href} />
-                </Grid>
-              ))}
-          </Grid>
-        </Paper>
-        <Button
-          variant="outlined"
-          color="primary"
-          fullWidth
-          sx={{
-            maxWidth: 480,
-            mb: 2,
-            borderRadius: 2,
-            py: 1.2,
-            fontWeight: 600,
-            fontSize: '1rem',
-            letterSpacing: 0.5,
-            bgcolor: '#fff',
-            borderColor: '#1976d2'
-          }}
-          onClick={() => router.push('/accountfound')}
-        >
-          + Link Bank Account
-        </Button>
-        <Paper
-          elevation={2}
-          sx={{
-            width: '100%',
-            maxWidth: 480,
-            p: 3,
-            borderRadius: 3,
-            mb: 2,
-            bgcolor: '#fff',
-          }}
-        >
-          <Typography variant="h6" sx={{ mb: 2, color: '#1976d2', fontWeight: 600 }}>
-            Bill Payments by BBPS
-          </Typography>
-          <Grid container spacing={2}>
-            {sidebarLinks
-              .filter(a =>
-                [
-                  'Mobile Recharge',
-                  'Electricity Bill',
-                  'Credit Card Home',
-                  'View All',
-                ].includes(a.label)
-              )
-              .map((action, idx) => (
-                <Grid
-                  item
-                  xs={3}
-                  sm={2}
-                  md={2}
-                  key={action.label}
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}
-                >
-                  <FeatureButton icon={action.icon} label={action.label} href={action.href} />
-                </Grid>
-              ))}
-          </Grid>
-        </Paper>
+        {/* Community box for elders */}
+        {role === 'elder' && (
+          <Paper
+            elevation={4}
+            sx={{
+              width: '100%',
+              maxWidth: 480,
+              p: 2,
+              mb: 3,
+              bgcolor: '#fffbe7',
+              border: '2px solid #ffb300',
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <GroupIcon sx={{ fontSize: 38, color: '#ffb300' }} />
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#b57b00' }}>
+                ElderWelfare Community
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#b57b00' }}>
+                Need urgent help? If no youth has responded, pull help from the organization and community.
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              variant="contained"
+              sx={{ bgcolor: '#ffb300', color: '#fff', fontWeight: 600 }}
+              onClick={() => alert('Request sent to ElderWelfare Community!')}
+            >
+              Pull Help
+            </Button>
+          </Paper>
+        )}
+
+        {/* User Grid */}
+        <Grid container spacing={2} sx={{ width: '100%', maxWidth: 480, mb: 2 }}>
+          {otherUsers.map((other) => (
+            <Grid item xs={12} key={other.username}>
+              <Paper
+                elevation={3}
+                sx={{
+                  position: 'relative',
+                  p: 2,
+                  mb: 1,
+                  minHeight: 130,
+                  borderRadius: 3,
+                  bgcolor: '#fff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                {/* Username on top left */}
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1976d2', mb: 0.5 }}>
+                  {other.username}
+                </Typography>
+                {/* Elder view: youth info, tickboxes for help */}
+                {role === 'elder' && (
+                  <>
+                    <Typography variant="body2" sx={{ color: '#666' }}>
+                      {other.email} | {other.countryCode} {other.phone}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+                      <Checkbox
+                        icon={<MedicalServicesIcon />}
+                        checkedIcon={<MedicalServicesIcon color="primary" />}
+                        checked={!!(requests[other.username]?.medical)}
+                        onChange={handleRequestChange(other.username, 'medical')}
+                      />
+                      <Typography variant="body2" sx={{ color: '#1976d2' }}>Medical Help</Typography>
+                      <Checkbox
+                        icon={<LocalPharmacyIcon />}
+                        checkedIcon={<LocalPharmacyIcon color="primary" />}
+                        checked={!!(requests[other.username]?.medicines)}
+                        onChange={handleRequestChange(other.username, 'medicines')}
+                      />
+                      <Typography variant="body2" sx={{ color: '#1976d2' }}>Medicines</Typography>
+                      <Checkbox
+                        icon={<AttachMoneyIcon />}
+                        checkedIcon={<AttachMoneyIcon color="primary" />}
+                        checked={!!(requests[other.username]?.money)}
+                        onChange={handleRequestChange(other.username, 'money')}
+                      />
+                      <Typography variant="body2" sx={{ color: '#1976d2' }}>Money</Typography>
+                    </Box>
+                    <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        label="Other help (message)"
+                        value={messages[other.username] || ''}
+                        onChange={handleMsgChange(other.username)}
+                        InputProps={{ endAdornment: <MessageIcon color="primary" /> }}
+                      />
+                      <Button
+                        variant="contained"
+                        sx={{ minWidth: 80, fontWeight: 600, bgcolor: '#1976d2', ml: 1 }}
+                        onClick={() => alert('Request sent!')}
+                      >
+                        Send
+                      </Button>
+                    </Box>
+                  </>
+                )}
+                {/* Youth view: see elders, tickboxes for giving help, QR code/amount */}
+                {role === 'youth' && (
+                  <>
+                    <Typography variant="body2" sx={{ color: '#666' }}>
+                      Age: {other.age} {other.medicalCondition ? `| ${other.medicalCondition}` : ''}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+                      <Checkbox
+                        icon={<MedicalServicesIcon />}
+                        checkedIcon={<MedicalServicesIcon color="primary" />}
+                        checked={!!(requests[other.username]?.medical)}
+                        onChange={handleRequestChange(other.username, 'medical')}
+                      />
+                      <Typography variant="body2" sx={{ color: '#1976d2' }}>Give Medical Help</Typography>
+                      <Checkbox
+                        icon={<LocalPharmacyIcon />}
+                        checkedIcon={<LocalPharmacyIcon color="primary" />}
+                        checked={!!(requests[other.username]?.medicines)}
+                        onChange={handleRequestChange(other.username, 'medicines')}
+                      />
+                      <Typography variant="body2" sx={{ color: '#1976d2' }}>Give Medicines</Typography>
+                      <Checkbox
+                        icon={<AttachMoneyIcon />}
+                        checkedIcon={<AttachMoneyIcon color="primary" />}
+                        checked={!!(requests[other.username]?.money)}
+                        onChange={handleRequestChange(other.username, 'money')}
+                      />
+                      <Typography variant="body2" sx={{ color: '#1976d2' }}>Donate Money</Typography>
+                    </Box>
+                    {/* QR code & amount section */}
+                    <Box sx={{ mt: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <Avatar
+                        src={other.qrCode || DEFAULT_QR_IMAGE}
+                        alt="QR Code"
+                        sx={{ width: 56, height: 56, border: '1px solid #ccc', bgcolor: '#fafafa' }}
+                      />
+                      <TextField
+                        type="number"
+                        size="small"
+                        label="Amount (₹)"
+                        value={amounts[other.username] || ''}
+                        onChange={handleAmountChange(other.username)}
+                        sx={{ width: 120 }}
+                      />
+                      <Button
+                        variant="contained"
+                        sx={{ fontWeight: 600, bgcolor: '#1976d2', ml: 1 }}
+                        onClick={() => alert('Donation request sent!')}
+                      >
+                        Confirm
+                      </Button>
+                    </Box>
+                    {/* Option to select "No QR" */}
+                    {(!other.qrCode || other.qrCode === DEFAULT_QR_IMAGE) && (
+                      <Typography variant="body2" sx={{ color: '#b0b0b0', mt: 1 }}>
+                        No QR Code Provided
+                      </Typography>
+                    )}
+                    {/* Message/help section */}
+                    <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        label="Other help (message)"
+                        value={messages[other.username] || ''}
+                        onChange={handleMsgChange(other.username)}
+                        InputProps={{ endAdornment: <MessageIcon color="primary" /> }}
+                      />
+                      <Button
+                        variant="contained"
+                        sx={{ minWidth: 80, fontWeight: 600, bgcolor: '#1976d2', ml: 1 }}
+                        onClick={() => alert('Offer sent!')}
+                      >
+                        Send
+                      </Button>
+                    </Box>
+                  </>
+                )}
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
       </Container>
 
-      {/* Bottom Navigation for Mobile (like Paytm) */}
+      {/* Bottom Navigation for Mobile */}
       {!isDesktop && (
         <Box sx={{
           width: '100vw',

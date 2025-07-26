@@ -8,7 +8,6 @@ import {
   Typography,
   Box,
   Divider,
-  Button,
   List,
   ListItem,
   ListItemAvatar,
@@ -16,233 +15,165 @@ import {
   Avatar,
   IconButton,
   Stack,
+  Chip,
 } from '@mui/material';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import CreditCardIcon from '@mui/icons-material/CreditCard';
-import PaidIcon from '@mui/icons-material/Paid';
-import LinkIcon from '@mui/icons-material/Link';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import ReportIcon from '@mui/icons-material/Report';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
+import InfoIcon from '@mui/icons-material/Info';
+import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 
-const bankList = [
+const dummyNotifications = [
   {
-    name: 'State Bank of India',
-    id: 'sbi',
-    logo: '/bank-icons/sbi.png',
-    desc: 'Check SBI account summary',
+    id: 1,
+    type: 'urgent',
+    for: 'elder1',
+    message: 'You have not received help from any youth for 1 month. Request escalated to the ElderWelfare Community.',
+    icon: <ReportIcon color="error" />,
+    time: '2h ago',
   },
   {
-    name: 'HDFC Bank',
-    id: 'hdfc',
-    logo: '/bank-icons/hdfc.png',
-    desc: 'Check HDFC account summary',
+    id: 2,
+    type: 'money',
+    for: 'elder1',
+    message: '₹1000 has been sent to your account by youth1.',
+    icon: <AttachMoneyIcon color="success" />,
+    time: '1d ago',
   },
   {
-    name: 'ICICI Bank',
-    id: 'icici',
-    logo: '/bank-icons/icici.png',
-    desc: 'Check ICICI account summary',
+    id: 3,
+    type: 'medical',
+    for: 'elder2',
+    message: 'youth2 has confirmed providing medical help.',
+    icon: <MedicalServicesIcon color="primary" />,
+    time: '3d ago',
   },
   {
-    name: 'Axis Bank',
-    id: 'axis',
-    logo: '/bank-icons/axis.png',
-    desc: 'Check Axis account summary',
+    id: 4,
+    type: 'org',
+    for: 'elder3',
+    message: 'Organization has not processed cashback for 2 days. 15% interest applied.',
+    icon: <HourglassBottomIcon color="warning" />,
+    time: '4d ago',
+  },
+  {
+    id: 5,
+    type: 'comment',
+    for: 'elder2',
+    message: 'youth3 commented: "Get well soon! Let me know if you need anything."',
+    icon: <InfoIcon color="info" />,
+    time: '5h ago',
+  },
+  {
+    id: 6,
+    type: 'confirmation',
+    for: 'elder1',
+    message: 'youth1 confirmed your payment was received.',
+    icon: <CheckCircleIcon color="success" />,
+    time: '10m ago',
   },
 ];
 
 export default function BalancePage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
-  const [linkedBank, setLinkedBank] = useState(null);
+  const [role, setRole] = useState(null);
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
-    // Try sessionStorage first
-    const username = sessionStorage.getItem('username');
-    const bank = sessionStorage.getItem('bank');
-    const accountNumber = sessionStorage.getItem('accountNumber');
-
-    if (username && bank && accountNumber) {
-      setUser({ username, bank, accountNumber });
-
-      // Find linked bank in list
-      const found = bankList.find(b => b.id === bank.toLowerCase());
-      if (found) {
-        setLinkedBank({
-          ...found,
-          accountNumber,
-        });
+    // Session/user info
+    let username = sessionStorage.getItem('username');
+    let phone = sessionStorage.getItem('phone');
+    let countryCode = sessionStorage.getItem('countryCode');
+    if (!username || !phone || !countryCode) {
+      if (typeof window !== 'undefined') {
+        const item = localStorage.getItem('chamcha.json');
+        try {
+          const local = item ? JSON.parse(item) : {};
+          username = username || local.username;
+          phone = phone || local.phone;
+          countryCode = countryCode || local.countryCode;
+          if (username) sessionStorage.setItem('username', username);
+          if (phone) sessionStorage.setItem('phone', phone);
+          if (countryCode) sessionStorage.setItem('countryCode', countryCode);
+        } catch {}
       }
+    }
+    if (!username) {
+      router.replace('/dashboard');
       return;
     }
+    setUser({ username, phone, countryCode });
 
-    // Fallback: Try reading from localStorage (chamcha.json)
-    if (typeof window !== 'undefined') {
-      const item = localStorage.getItem('chamcha.json');
-      try {
-        const localUser = item ? JSON.parse(item) : {};
-        if (localUser.username && localUser.bank && localUser.accountNumber) {
-          setUser(localUser);
-          // Find linked bank in list
-          const found = bankList.find(b => b.id === localUser.bank.toLowerCase());
-          if (found) {
-            setLinkedBank({
-              ...found,
-              accountNumber: localUser.accountNumber,
-            });
-          }
-        } else {
-          router.replace('/balance');
-        }
-      } catch {
-        router.replace('/balance');
-      }
-    } else {
-      router.replace('/balance');
-    }
+    // Dummy: infer role from username (matches dashboard)
+    const dummyElders = ['elder1', 'elder2', 'elder3'];
+    setRole(dummyElders.includes(username) ? 'elder' : 'youth');
+
+    // Notifications for this user (dummy)
+    setNotifications(
+      dummyNotifications.filter(n => n.for === username || n.type === 'org')
+    );
   }, [router]);
 
-  const handleBankClick = (bankId) => {
-    router.push(`/banks/${bankId}`);
-  };
-
-  // Remove linked bank from the list if present
-  const otherBanks = linkedBank
-    ? bankList.filter(b => b.id !== linkedBank.id)
-    : bankList;
-
   return (
-    <Container maxWidth="xs" sx={{
+    <Container maxWidth="sm" sx={{
       minHeight: '100vh',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+      py: 4,
     }}>
       <Paper elevation={3} sx={{
         width: '100%',
-        borderRadius: 4,
         bgcolor: '#fff',
         textAlign: 'center',
         px: 0,
-        py: 3,
+        py: 2,
+        borderRadius: 4,
       }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-          Balance & History
-        </Typography>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, mb: 2 }}>
-          <Typography variant="subtitle2" color="text.secondary">
-            View and manage your linked bank accounts
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+          <NotificationsIcon fontSize="large" color="primary" sx={{ mr: 1 }} />
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            Notifications & Requests
           </Typography>
-          <Button
-            size="small"
-            variant="outlined"
-            sx={{ fontSize: '0.78rem', borderRadius: 2 }}
-            onClick={() => router.push('/banks')}
-          >
-            Add Bank A/c
-          </Button>
         </Box>
-        <Divider />
+        <Divider sx={{ mb: 2 }} />
         <List>
-          {/* Linked bank shown on top */}
-          {linkedBank && (
-            <ListItem
-              alignItems="flex-start"
-              secondaryAction={
-                <IconButton edge="end" aria-label="go" onClick={() => handleBankClick(linkedBank.id)}>
-                  <ArrowForwardIosIcon fontSize="small" />
-                </IconButton>
-              }
-              button
-              onClick={() => handleBankClick(linkedBank.id)}
-              sx={{
-                py: 1.4,
-                px: 2,
-                bgcolor: '#e2f6ff',
-                mb: 0.5,
-                border: '2px solid #1976d2',
-                borderRadius: 2,
-                '&:hover': { bgcolor: '#d0ecff' },
-              }}
-            >
+          {notifications.length === 0 && (
+            <ListItem>
+              <ListItemText
+                primary={<Typography variant="body2" color="text.secondary">No notifications yet.</Typography>}
+              />
+            </ListItem>
+          )}
+          {notifications.map(n => (
+            <ListItem key={n.id} alignItems="flex-start" sx={{
+              mb: 1.5, bgcolor: n.type === 'urgent' ? '#fff3e0' : '#f8faff', borderRadius: 2,
+              borderLeft: n.type === 'urgent' ? '5px solid #ff9800' : undefined,
+              boxShadow: n.type === 'urgent' ? 3 : 1,
+            }}>
               <ListItemAvatar>
-                <Avatar
-                  src={linkedBank.logo}
-                  sx={{ bgcolor: 'white', border: '1px solid #e3e3e3' }}
-                  alt={linkedBank.name}
-                >
-                  <AccountBalanceIcon color="primary" />
-                </Avatar>
+                <Avatar sx={{ bgcolor: '#fff' }}>{n.icon}</Avatar>
               </ListItemAvatar>
               <ListItemText
                 primary={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1976d2' }}>
-                      {linkedBank.name}
+                      {n.type === 'urgent' ? 'Urgent' : n.type.charAt(0).toUpperCase() + n.type.slice(1)}
                     </Typography>
-                    <Typography variant="body2" sx={{
-                      color: '#1976d2',
-                      background: '#e3f2fd',
-                      px: 1.2,
-                      py: 0.2,
-                      borderRadius: 1,
-                      fontWeight: 500,
-                    }}>
-                      ****{linkedBank.accountNumber?.slice(-4)}
-                    </Typography>
+                    {n.type === 'urgent' && <Chip label="Escalated" color="warning" size="small" />}
                   </Box>
                 }
                 secondary={
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    Linked bank (default for UPI)
-                  </Typography>
-                }
-              />
-            </ListItem>
-          )}
-          {/* Show other banks below */}
-          {otherBanks.map((bank) => (
-            <ListItem
-              key={bank.id}
-              alignItems="flex-start"
-              secondaryAction={
-                <IconButton edge="end" aria-label="go" onClick={() => handleBankClick(bank.id)}>
-                  <ArrowForwardIosIcon fontSize="small" />
-                </IconButton>
-              }
-              button
-              onClick={() => handleBankClick(bank.id)}
-              sx={{
-                py: 1.2,
-                px: 2,
-                '&:hover': { bgcolor: '#f4f8fb' },
-              }}
-            >
-              <ListItemAvatar>
-                <Avatar
-                  src={bank.logo}
-                  sx={{ bgcolor: 'white', border: '1px solid #e3e3e3' }}
-                  alt={bank.name}
-                >
-                  <AccountBalanceIcon color="primary" />
-                </Avatar>
-              </ListItemAvatar>
-              <ListItemText
-                primary={
-                  <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                    {bank.name}
-                  </Typography>
-                }
-                secondary={
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    {bank.desc}
-                  </Typography>
+                  <Box>
+                    <Typography variant="body2" sx={{ color: '#333', mb: 0.5 }}>
+                      {n.message}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#999' }}>{n.time}</Typography>
+                  </Box>
                 }
               />
             </ListItem>
@@ -262,67 +193,12 @@ export default function BalancePage() {
               gap: 1
             }}
           >
-            <CreditCardIcon color="primary" fontSize="small" />
+            <LocalHospitalIcon color="primary" fontSize="small" />
             <Typography variant="body2" color="text.secondary" flex={1}>
-              Credit Card — Get best cashback & rewards!
+              All requests and important notifications will appear here, even when you are logged out.
             </Typography>
-            <Button size="small" sx={{ minWidth: 0, fontSize: '0.78rem' }} disabled>
-              Apply Now
-            </Button>
-          </Box>
-          <Box
-            sx={{
-              py: 1,
-              px: 2,
-              bgcolor: '#e3f2fd',
-              borderRadius: 2,
-              textAlign: 'left',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1
-            }}
-          >
-            <PaidIcon color="primary" fontSize="small" />
-            <Typography variant="body2" color="text.secondary" flex={1}>
-              Personal Loan — Get up to ₹5 lacs!
-            </Typography>
-            <Button size="small" sx={{ minWidth: 0, fontSize: '0.78rem' }} disabled>
-              Get Now
-            </Button>
-          </Box>
-          <Box
-            sx={{
-              py: 1,
-              px: 2,
-              bgcolor: '#e3f2fd',
-              borderRadius: 2,
-              textAlign: 'left',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1
-            }}
-          >
-            <LinkIcon color="primary" fontSize="small" />
-            <Typography variant="body2" color="text.secondary" flex={1}>
-              Link Your Bank Account — Super fast UPI money transfers
-            </Typography>
-            <Button size="small" onClick={() => router.push('/banks')} sx={{ minWidth: 0, fontSize: '0.78rem' }}>
-              Proceed
-            </Button>
           </Box>
         </Stack>
-        <Divider sx={{ mt: 2, mb: 1 }} />
-        <Button
-          variant="outlined"
-          fullWidth
-          sx={{ borderRadius: 2, fontWeight: 500, mb: 1 }}
-          onClick={() => router.push('/banks')}
-        >
-          View All Accounts
-        </Button>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          (No transaction history available.)
-        </Typography>
       </Paper>
     </Container>
   );
