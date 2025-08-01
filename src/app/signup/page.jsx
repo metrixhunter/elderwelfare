@@ -15,7 +15,8 @@ import {
   InputLabel,
   FormControl,
   Box,
-  Avatar,
+  IconButton,
+  Avatar
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import { encrypt } from '@/app/utils/encryption';
@@ -95,6 +96,7 @@ export default function SignupPage() {
     newArr[idx] = value;
     setter(newArr);
   };
+
   const handleAddField = (setter, arr) => setter([...arr, '']);
   const handleRemoveField = (setter, arr, idx) => {
     if (arr.length > 1) {
@@ -114,11 +116,16 @@ export default function SignupPage() {
 
   const redirectToOtp = () => router.push(`/otp?redirect=/accountfound`);
 
+  const setErr = (msg) => {
+    setErrorMsg(msg);
+    setOpenSnackbar(true);
+  };
+
   const handleSignup = async () => {
     if (!username.trim()) return setErr('Please enter a username.');
     if (!password) return setErr('Please enter a password.');
-    const today = new Date();
 
+    const today = new Date();
     for (let i = 0; i < names.length; i++) {
       if (!names[i].trim()) return setErr(`Name missing at position ${i + 1}`);
       const bd = birthdates[i];
@@ -141,7 +148,8 @@ export default function SignupPage() {
       emails: emails[idx] ? [emails[idx]] : [emails[0]],
       birthdate: birthdates[idx] || null,
       age: ages[idx] ? Number(ages[idx]) : null,
-      images: images[idx] ? [imagePreviews[idx]] : []
+      images: images[idx] ? [imagePreviews[idx]] : [],
+      countryCode
     }));
 
     const userData = {
@@ -206,10 +214,81 @@ export default function SignupPage() {
     }
   };
 
-  const setErr = (msg) => {
-    setErrorMsg(msg);
-    setOpenSnackbar(true);
-  };
+  return (
+    <HeaderFooterWrapper>
+      <Container maxWidth="md">
+        <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={() => setOpenSnackbar(false)}>
+          <Alert severity={success ? 'success' : 'error'} onClose={() => setOpenSnackbar(false)}>
+            {errorMsg}
+          </Alert>
+        </Snackbar>
 
-  return <></>; // UI same as before, skipped here for brevity
+        <Paper elevation={3} sx={{ padding: 3, marginTop: 4 }}>
+          <Typography variant="h5" gutterBottom>Sign Up</Typography>
+
+          <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth margin="normal" />
+          <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth margin="normal" />
+
+          {names.map((name, idx) => (
+            <Box key={idx} sx={{ display: 'flex', gap: 1 }}>
+              <TextField label={`Name ${idx + 1}`} value={name} onChange={(e) => handleArrayChange(setNames, names, idx, e.target.value)} fullWidth />
+              <Button onClick={() => handleRemoveField(setNames, names, idx)}>-</Button>
+            </Box>
+          ))}
+          <Button onClick={() => handleAddField(setNames, names)}>Add Name</Button>
+
+          {/* Similar fields for phone, email, birthdate, age */}
+          {/* Add email input */}
+          {emails.map((email, idx) => (
+            <TextField key={idx} label={`Email ${idx + 1}`} value={email} onChange={(e) => handleArrayChange(setEmails, emails, idx, e.target.value)} fullWidth margin="normal" />
+          ))}
+          <Button onClick={() => handleAddField(setEmails, emails)}>Add Email</Button>
+
+          {/* Phone */}
+          {phoneNumbers.map((phone, idx) => (
+            <TextField key={idx} label={`Phone ${idx + 1}`} value={phone} onChange={(e) => handleArrayChange(setPhoneNumbers, phoneNumbers, idx, e.target.value)} fullWidth margin="normal" />
+          ))}
+          <Button onClick={() => handleAddField(setPhoneNumbers, phoneNumbers)}>Add Phone</Button>
+
+          {/* Birthdates and ages */}
+          {birthdates.map((date, idx) => (
+            <TextField key={idx} type="date" label={`Birthdate ${idx + 1}`} InputLabelProps={{ shrink: true }} value={date} onChange={(e) => handleArrayChange(setBirthdates, birthdates, idx, e.target.value)} fullWidth margin="normal" />
+          ))}
+          <Button onClick={() => handleAddField(setBirthdates, birthdates)}>Add Birthdate</Button>
+
+          {ages.map((age, idx) => (
+            <TextField key={idx} label={`Age ${idx + 1}`} type="number" value={age} onChange={(e) => handleArrayChange(setAges, ages, idx, e.target.value)} fullWidth margin="normal" />
+          ))}
+          <Button onClick={() => handleAddField(setAges, ages)}>Add Age</Button>
+
+          <TextField label="Address" value={address} onChange={(e) => setAddress(e.target.value)} fullWidth margin="normal" />
+
+          {/* Country code */}
+          <FormControl fullWidth margin="normal">
+            <InputLabel>Country Code</InputLabel>
+            <Select value={countryCode} label="Country Code" onChange={(e) => setCountryCode(e.target.value)}>
+              {countryCodes.map((option) => (
+                <MenuItem key={option.code} value={option.code}>{option.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Image upload */}
+          <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
+            <IconButton component="label">
+              <PhotoCamera />
+              <input hidden type="file" multiple onChange={handleImageChange} />
+            </IconButton>
+            {imagePreviews.map((src, idx) => (
+              <Avatar key={idx} src={src} sx={{ ml: 1, width: 56, height: 56 }} />
+            ))}
+          </Box>
+
+          <Button variant="contained" color="primary" fullWidth sx={{ mt: 3 }} onClick={handleSignup}>
+            Sign Up
+          </Button>
+        </Paper>
+      </Container>
+    </HeaderFooterWrapper>
+  );
 }
