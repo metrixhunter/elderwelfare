@@ -168,34 +168,34 @@ export default function Layout({ children }) {
     </html>
   );
 }
-
 function MainPageContent() {
   return (
     <HeaderFooterWrapper>
-      <Box sx={{ position: "relative", minHeight: "70vh", px: { xs: 2, md: 4 }, pt: 2 }}>
+      <Box sx={{ position: "relative", minHeight: "70vh", px: { xs: 2, md: 8 }, pt: 6, pb: 8 }}>
         <Box sx={{
           display: "flex",
           flexDirection: { xs: "column", md: "row" },
           justifyContent: "space-between",
-          alignItems: "flex-end",
+          alignItems: "center",
+          gap: { xs: 4, md: 8 },
           background: "linear-gradient(to bottom, #e8f5e9, #c8e6c9)",
-          borderRadius: 2,
+          borderRadius: 3,
           px: { xs: 3, md: 6 },
-          pt: 6,
-          pb: 4,
-          mb: 3,
+          py: { xs: 4, md: 6 }
         }}>
-          <Box sx={{ maxWidth: 600 }}>
-            <Typography variant="h4" sx={{ color: "#2E7D32", fontWeight: 800, mb: 1 }}>
+          <Box sx={{ maxWidth: { xs: '100%', md: 480 }, color: "#2E7D32" }}>
+            <Typography variant="h3" sx={{ fontWeight: 800, mb: 2 }}>
               Welcome to ElderWelfare
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
               Caring for elders. Building dignity, community, and support—for today and tomorrow.
             </Typography>
-            <Paper elevation={3} sx={{ p: 3, borderRadius: 3, backgroundColor: "#ffffff" }}>
-              <Typography paragraph><b>ElderWelfare</b> is your platform for elder care and mutual support. By caring for elders now, you help build a community where everyone is supported—now and in the future.</Typography>
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 3, backgroundColor: "rgba(255, 255, 255, 0.85)" }}>
+              <Typography paragraph>
+                <b>ElderWelfare</b> is your platform for elder care and mutual support. By caring for elders now, you help build a community where everyone is supported—now and in the future.
+              </Typography>
               <Typography paragraph><b>What We Offer:</b></Typography>
-              <Box component="ul" sx={{ pl: 3 }}>
+              <Box component="ul" sx={{ pl: 4, mb: 0 }}>
                 <li>Care services: health, home, wellness, and companionship</li>
                 <li>Legal and financial help for elders</li>
                 <li>Community and volunteer support</li>
@@ -207,11 +207,33 @@ function MainPageContent() {
               </Typography>
             </Paper>
           </Box>
+          <Box sx={{
+            flex: 1,
+            maxWidth: { xs: '100%', md: 600 },
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}>
+            <Box
+              component="img"
+              src="/images/elder-hero.png"
+              alt="Elder care community"
+              sx={{
+                width: '100%',
+                height: 'auto',
+                borderRadius: 3,
+                boxShadow: '0 6px 36px rgba(0,0,0,0.12)',
+                objectFit: 'cover',
+                maxHeight: 400,
+              }}
+            />
+          </Box>
         </Box>
       </Box>
     </HeaderFooterWrapper>
   );
 }
+
 
 function FooterElderWelfare() {
   return (
