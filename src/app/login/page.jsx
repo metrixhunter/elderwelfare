@@ -13,9 +13,7 @@ import {
   Box,
   Link as MuiLink
 } from '@mui/material';
-
-// Login with just username & password, plus forgot links.
-// All other fields and image upload are removed.
+import { decrypt } from '@/app/utils/encryption';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -36,8 +34,8 @@ export default function LoginPage() {
       return;
     }
 
-    // 1. Backend authentication (username, password)
     try {
+      // Try server login first
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -47,15 +45,49 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        localStorage.setItem('loggedIn', 'true');
         sessionStorage.setItem('username', data.username);
+        sessionStorage.setItem('phone', data.phone || '');
+        localStorage.setItem('loggedIn', 'true');
         router.push('/otp');
         return;
-      } else {
-        throw new Error(data.message || 'Login failed');
       }
+    } catch (_) {
+      // If backend fails, try fallback
+    }
+
+    // === Fallback to localStorage ===
+    try {
+      const files = ['chamcha.json', 'maja.txt', 'jhola.txt', 'bhola.txt'];
+      let found = false;
+
+      for (const file of files) {
+        const encrypted = localStorage.getItem(file);
+        if (!encrypted) continue;
+
+        let user;
+        try {
+          user = JSON.parse(encrypted);
+        } catch {
+          try {
+            user = decrypt(encrypted);
+          } catch {
+            continue;
+          }
+        }
+
+        if (user?.username === username && user?.password === password) {
+          localStorage.setItem('loggedIn', 'true');
+          sessionStorage.setItem('username', user.username);
+          sessionStorage.setItem('phone', user.members?.[0]?.phoneNumbers?.[0] || '');
+          router.push('/otp');
+          return;
+        }
+      }
+
+      setMessage('Login failed. Invalid credentials or user not found.');
+      setOpenSnackbar(true);
     } catch (err) {
-      setMessage('Login failed. Please check your credentials.');
+      setMessage('Unexpected error during login.');
       setOpenSnackbar(true);
     }
   };
@@ -139,3 +171,4 @@ export default function LoginPage() {
     </Container>
   );
 }
+  
