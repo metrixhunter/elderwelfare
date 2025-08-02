@@ -114,7 +114,6 @@ export default function SignupPage() {
   };
 
   const redirectToOtp = () => router.push(`/otp?redirect=/accountfound`);
-
   const setErr = (msg) => {
     setErrorMsg(msg);
     setOpenSnackbar(true);
@@ -191,7 +190,7 @@ export default function SignupPage() {
         return setErr(result.message || 'Signup failed');
       }
 
-      // ✅ MongoDB success: also save to local backup
+      // ✅ Save to local files even after MongoDB success
       await saveToLocalBackup();
 
       sessionStorage.setItem('username', username);
@@ -221,69 +220,65 @@ export default function SignupPage() {
     <HeaderFooterWrapper>
       <Container maxWidth="md">
         <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={() => setOpenSnackbar(false)}>
-          <Alert severity={success ? 'success' : 'error'} onClose={() => setOpenSnackbar(false)}>
-            {errorMsg}
-          </Alert>
+          <Alert severity={success ? 'success' : 'error'}>{errorMsg}</Alert>
         </Snackbar>
-
         <Paper elevation={3} sx={{ padding: 3 }}>
           <Typography variant="h5" gutterBottom>Sign Up</Typography>
 
-          <TextField
-            label="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-
-          <TextField
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
+          <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth margin="normal" />
+          <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth margin="normal" />
 
           {names.map((name, idx) => (
-            <Box key={idx} sx={{ display: 'flex', alignItems: 'center', marginBottom: 2 }}>
-              <TextField
-                label={`Name ${idx + 1}`}
-                value={name}
-                onChange={(e) => handleArrayChange(setNames, names, idx, e.target.value)}
-                fullWidth
-                margin="normal"
-              />
+            <Box key={idx} sx={{ display: 'flex', alignItems: 'center' }}>
+              <TextField label={`Name ${idx + 1}`} value={name} onChange={(e) => handleArrayChange(setNames, names, idx, e.target.value)} fullWidth margin="normal" />
               <Button onClick={() => handleRemoveField(setNames, names, idx)}>-</Button>
             </Box>
           ))}
           <Button onClick={() => handleAddField(setNames, names)}>Add Name</Button>
 
           {phoneNumbers.map((phone, idx) => (
-            <TextField
-              key={idx}
-              label={`Phone Number ${idx + 1}`}
-              value={phone}
-              onChange={(e) => handleArrayChange(setPhoneNumbers, phoneNumbers, idx, e.target.value)}
-              fullWidth
-              margin="normal"
-            />
+            <TextField key={idx} label={`Phone ${idx + 1}`} value={phone} onChange={(e) => handleArrayChange(setPhoneNumbers, phoneNumbers, idx, e.target.value)} fullWidth margin="normal" />
           ))}
           <Button onClick={() => handleAddField(setPhoneNumbers, phoneNumbers)}>Add Phone</Button>
 
           <FormControl fullWidth margin="normal">
             <InputLabel>Country Code</InputLabel>
-            <Select
-              value={countryCode}
-              onChange={(e) => setCountryCode(e.target.value)}
-              label="Country Code"
-            >
+            <Select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} label="Country Code">
               {countryCodes.map((option) => (
                 <MenuItem key={option.code} value={option.code}>{option.label}</MenuItem>
               ))}
             </Select>
           </FormControl>
+
+          {emails.map((email, idx) => (
+            <TextField key={idx} label={`Email ${idx + 1}`} value={email} onChange={(e) => handleArrayChange(setEmails, emails, idx, e.target.value)} fullWidth margin="normal" />
+          ))}
+          <Button onClick={() => handleAddField(setEmails, emails)}>Add Email</Button>
+
+          {birthdates.map((bd, idx) => (
+            <TextField key={idx} label={`Birthdate ${idx + 1}`} type="date" InputLabelProps={{ shrink: true }} value={bd} onChange={(e) => handleArrayChange(setBirthdates, birthdates, idx, e.target.value)} fullWidth margin="normal" />
+          ))}
+          <Button onClick={() => handleAddField(setBirthdates, birthdates)}>Add Birthdate</Button>
+
+          {ages.map((age, idx) => (
+            <TextField key={idx} label={`Age ${idx + 1}`} type="number" value={age} onChange={(e) => handleArrayChange(setAges, ages, idx, e.target.value)} fullWidth margin="normal" />
+          ))}
+          <Button onClick={() => handleAddField(setAges, ages)}>Add Age</Button>
+
+          <TextField label="Address" value={address} onChange={(e) => setAddress(e.target.value)} fullWidth multiline rows={3} margin="normal" />
+
+          <Box sx={{ mt: 2, mb: 2 }}>
+            <Typography variant="subtitle1">Upload QR/Image</Typography>
+            <IconButton color="primary" component="label">
+              <PhotoCamera />
+              <input hidden accept="image/*" type="file" onChange={handleImageChange} multiple />
+            </IconButton>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
+              {imagePreviews.map((src, idx) => (
+                <Avatar key={idx} src={src} alt={`Preview ${idx}`} sx={{ width: 64, height: 64 }} />
+              ))}
+            </Box>
+          </Box>
 
           <Button variant="contained" onClick={handleSignup}>Sign Up</Button>
         </Paper>
@@ -291,5 +286,7 @@ export default function SignupPage() {
     </HeaderFooterWrapper>
   );
 }
+
+      
 
 
