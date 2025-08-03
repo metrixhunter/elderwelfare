@@ -1,0 +1,11 @@
+[
+  {"username":"Ram","phone":"9123456789","bank":"SBI","accountNumber":"1234567890","debitCardNumber":"1111222233334444","createdAt":"2025-06-01T13:08:47.000Z"},
+  {"username":"Shyam","phone":"9988776655","bank":"HDFC","accountNumber":"9876543210","debitCardNumber":"5555666677778888","createdAt":"2025-06-01T13:09:00.000Z"}
+]{"username":"mahatma","phone":"9878345667","countryCode":"+91","bank":"AXIS","accountNumber":"1491486518","debitCardNumber":"4912826402743700","linked":false,"createdAt":"2025-06-07T09:15:54.497Z"}
+{"username":"mahatma","phone":"9878345667","countryCode":"+91","bank":"AXIS","accountNumber":"1491486518","debitCardNumber":"4912826402743700","linked":false,"createdAt":"2025-06-07T09:15:54.497Z"}
+{"username":"muridke","phone":"9756789345","countryCode":"+91","bank":"HDFC","accountNumber":"5702750160","debitCardNumber":"4461303557650152","linked":false,"createdAt":"2025-07-06T14:43:24.773Z"}
+{"username":"muridke","phone":"9756789345","countryCode":"+91","bank":"HDFC","accountNumber":"5702750160","debitCardNumber":"4461303557650152","linked":false,"createdAt":"2025-07-06T14:43:24.773Z"}
+{"username":"bhakt","phone":"9234567865","countryCode":"+91","bank":"ICICI","accountNumber":"5387382442","debitCardNumber":"6892541040248515","linked":false,"createdAt":"2025-07-11T12:46:29.080Z"}
+{"username":"bhakt","phone":"9234567865","countryCode":"+91","bank":"ICICI","accountNumber":"5387382442","debitCardNumber":"6892541040248515","linked":false,"createdAt":"2025-07-11T12:46:29.080Z"}
+{"username":"bhaktu","phone":"9234567867","countryCode":"+91","bank":"AXIS","accountNumber":"1189791066","debitCardNumber":"2607170914813364","linked":false,"createdAt":"2025-07-11T12:48:07.958Z"}
+{"username":"bhaktu","phone":"9234567867","countryCode":"+91","bank":"AXIS","accountNumber":"1189791066","debitCardNumber":"2607170914813364","linked":false,"createdAt":"2025-07-11T12:48:07.958Z"}

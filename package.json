@@ -1,0 +1,48 @@
+{
+  "name": "eldcare-welfare",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "export": "next export",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.2.0",
+    "@mui/material": "^7.2.0",
+    "@prisma/client": "^6.9.0",
+    "@types/bcryptjs": "^3.0.0",
+    "@vonage/server-sdk": "^3.21.0",
+    "aws4": "^1.13.2",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "mongoose": "^8.15.0",
+    "mysql2": "^3.14.1",
+    "next": "15.2.4",
+    "next-auth": "^4.24.11",
+    "pg": "^8.16.0",
+    "prisma": "^6.9.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "redis": "^5.5.6",
+    "twilio": "^5.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/bun": "latest",
+    "eslint": "^9.32.0",
+    "gh-pages": "^6.3.0",
+    "tailwindcss": "^4"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
