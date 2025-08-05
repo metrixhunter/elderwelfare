@@ -1,5 +1,4 @@
 'use client';
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -22,73 +21,112 @@ export default function LoginPage() {
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const router = useRouter();
 
+  const setError = (msg) => {
+    setMessage(msg);
+    setOpenSnackbar(true);
+  };
+
+  const localClientFallbackLogin = ({ username: u, password: p }) => {
+    // Look through the local storage backups you use on signup
+    const files = ['chamcha.json', 'maja.txt', 'jhola.txt', 'bhola.txt'];
+    for (const file of files) {
+      const item = localStorage.getItem(file);
+      if (!item) continue;
+
+      // Try to parse JSON directly first
+      let user = null;
+      try {
+        user = JSON.parse(item);
+      } catch {
+        // If not JSON, try decrypt
+        try {
+          user = decrypt(item);
+        } catch {
+          // not usable
+          continue;
+        }
+      }
+
+      if (!user) continue;
+      if (user.username === u && user.password === p) {
+        // Local login success
+        sessionStorage.setItem('username', user.username);
+        sessionStorage.setItem('phone', user.phone?.number || '');
+        localStorage.setItem('loggedIn', 'true');
+        return true;
+      }
+    }
+    return false;
+  };
+
   const handleLogin = async () => {
     if (!username.trim()) {
-      setMessage('Please enter your username.');
-      setOpenSnackbar(true);
-      return;
+      return setError('Please enter your username.');
     }
     if (!password) {
-      setMessage('Please enter your password.');
-      setOpenSnackbar(true);
-      return;
+      return setError('Please enter your password.');
     }
 
+    // Primary: call the single consolidated server route that does all backend checks.
     try {
-      // Try server login first
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await res.json();
+      // Try to parse body (server should return JSON)
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
 
-      if (res.ok && data.success) {
+      if (res.ok && data && data.success) {
+        // Server authenticated user (could be from Mongo/Redis/Firebase/local) -> redirect to dashboard
         sessionStorage.setItem('username', data.username);
         sessionStorage.setItem('phone', data.phone || '');
         localStorage.setItem('loggedIn', 'true');
-        router.push('/otp');
+        router.push('/dashboard');
         return;
       }
-    } catch (_) {
-      // If backend fails, try fallback
-    }
 
-    // === Fallback to localStorage ===
-    try {
-      const files = ['chamcha.json', 'maja.txt', 'jhola.txt', 'bhola.txt'];
-      let found = false;
-
-      for (const file of files) {
-        const encrypted = localStorage.getItem(file);
-        if (!encrypted) continue;
-
-        let user;
-        try {
-          user = JSON.parse(encrypted);
-        } catch {
-          try {
-            user = decrypt(encrypted);
-          } catch {
-            continue;
-          }
-        }
-
-        if (user?.username === username && user?.password === password) {
-          localStorage.setItem('loggedIn', 'true');
-          sessionStorage.setItem('username', user.username);
-          sessionStorage.setItem('phone', user.members?.[0]?.phoneNumbers?.[0] || '');
-          router.push('/otp');
-          return;
-        }
+      // If server responded but auth failed, show message (do NOT redirect)
+      if (data && !data.success) {
+        const msg = data.message || 'Login failed. Check credentials.';
+        return setError(msg);
       }
 
-      setMessage('Login failed. Invalid credentials or user not found.');
-      setOpenSnackbar(true);
-    } catch (err) {
-      setMessage('Unexpected error during login.');
-      setOpenSnackbar(true);
+      // If server didn't respond properly but no network error (res not ok without body)
+      if (!res.ok) {
+        const statusMsg = (data && data.message) || `Login failed (status ${res.status})`;
+        return setError(statusMsg);
+      }
+    } catch (networkErr) {
+      // Network / server unreachable -> fall back to local client checks
+      console.warn('[Login] Server unreachable, attempting local fallback:', networkErr);
+      const ok = localClientFallbackLogin({ username, password });
+      if (ok) {
+        router.push('/dashboard');
+        return;
+      } else {
+        return setError('Server unreachable and local fallback did not find the user.');
+      }
+    }
+
+    // As a last fallback (paranoia): try client-side local backups
+    try {
+      const ok = localClientFallbackLogin({ username, password });
+      if (ok) {
+        router.push('/dashboard');
+        return;
+      } else {
+        setError('Login failed. Invalid credentials or user not found.');
+      }
+    } catch (e) {
+      console.error('[Login] Unexpected fallback error:', e);
+      setError('Unexpected error during login.');
     }
   };
 
@@ -122,11 +160,7 @@ export default function LoginPage() {
           required
         />
         <Box textAlign="left" ml={0.5}>
-          <MuiLink
-            href="/otp"
-            underline="hover"
-            sx={{ fontSize: '0.95rem', cursor: 'pointer' }}
-          >
+          <MuiLink href="/otp" underline="hover" sx={{ fontSize: '0.95rem' }}>
             Forgot username?
           </MuiLink>
         </Box>
@@ -141,11 +175,7 @@ export default function LoginPage() {
           required
         />
         <Box textAlign="left" ml={0.5}>
-          <MuiLink
-            href="/otp"
-            underline="hover"
-            sx={{ fontSize: '0.95rem', cursor: 'pointer' }}
-          >
+          <MuiLink href="/otp" underline="hover" sx={{ fontSize: '0.95rem' }}>
             Forgot password?
           </MuiLink>
         </Box>
@@ -171,4 +201,3 @@ export default function LoginPage() {
     </Container>
   );
 }
-  

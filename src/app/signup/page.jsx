@@ -1,25 +1,16 @@
 'use client';
-import { HeaderFooterWrapper } from '../layout';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  TextField,
-  Button,
-  Typography,
-  Container,
-  Paper,
-  Alert,
-  Snackbar,
-  MenuItem,
-  Select,
-  InputLabel,
-  FormControl,
-  Box,
-  Avatar,
-  IconButton
+  TextField, Button, Typography, Container, Paper, Alert, Snackbar, IconButton, Box, MenuItem, Select, InputLabel, FormControl
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import { encrypt } from '@/app/utils/encryption';
+// If this client helper doesn't exist in your project, comment out the next line.
+import saveUserToFirebase from '@/backend/utils/firebaseSave.client';
+
+const WAIT_TIMEOUT_MS = 15000; // time to wait for API before treating it as "slow" and redirecting
 
 const countryCodes = [
   { code: '+91', label: 'India (+91)' },
@@ -34,7 +25,7 @@ const countryCodes = [
 
 async function saveToPublicFolder(filename, value) {
   try {
-    let key = `public_user_data_${filename}`;
+    const key = `public_user_data_${filename}`;
     let existing = localStorage.getItem(key) || '';
     localStorage.setItem(key, existing + value + '\n');
   } catch {}
@@ -50,7 +41,7 @@ function isUserSaved(phone) {
   return localStorage.getItem(`user:${phone}`) !== null;
 }
 
-async function tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar, redirectToOtp) {
+async function tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar, redirectToDashboard) {
   try {
     const res = await fetch('/api/auth/redis-signup', {
       method: 'POST',
@@ -71,7 +62,7 @@ async function tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar
     setSuccess(true);
     setErrorMsg('Signed up using Redis fallback! Please enter the OTP sent to your phone.');
     setOpenSnackbar(true);
-    setTimeout(redirectToOtp, 900);
+    setTimeout(redirectToDashboard, 900);
     return true;
   } catch {
     return false;
@@ -93,6 +84,7 @@ export default function SignupPage() {
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [openSnackbar, setOpenSnackbar] = useState(false);
+
   const router = useRouter();
 
   const handleArrayChange = (setter, arr, idx, value) => {
@@ -117,7 +109,7 @@ export default function SignupPage() {
     }
   };
 
-  const redirectToOtp = () => router.push(`/otp?redirect=/accountfound`);
+  const redirectToDashboard = () => router.push('/dashboard');
   const setErr = (msg) => {
     setErrorMsg(msg);
     setOpenSnackbar(true);
@@ -126,15 +118,31 @@ export default function SignupPage() {
   const saveToLocalBackup = async (userData) => {
     const phone = userData.phone?.number || '';
     const encrypted = encrypt(userData);
-    localStorage.setItem('chamcha.json', JSON.stringify(userData));
-    localStorage.setItem('maja.txt', encrypted);
-    localStorage.setItem('jhola.txt', encrypted);
-    localStorage.setItem('bhola.txt', encrypt({ ...userData, timestamp: userData.timestamp }));
-    await saveToPublicFolder('chamcha.json', JSON.stringify(userData));
-    await saveToPublicFolder('maja.txt', encrypted);
-    await saveToPublicFolder('jhola.txt', encrypted);
-    await saveToPublicFolder('bhola.txt', encrypt({ ...userData, timestamp: userData.timestamp }));
-    saveToRedisLike(phone, userData);
+
+    try { await saveUserToFirebase?.(userData); } catch {}
+
+    try {
+      localStorage.setItem('chamcha.json', JSON.stringify(userData));
+      localStorage.setItem('maja.txt', encrypted);
+      localStorage.setItem('jhola.txt', encrypted);
+      localStorage.setItem('bhola.txt', encrypt({ ...userData, timestamp: userData.timestamp }));
+
+      await saveToPublicFolder('chamcha.json', JSON.stringify(userData));
+      await saveToPublicFolder('maja.txt', encrypted);
+      await saveToPublicFolder('jhola.txt', encrypted);
+      await saveToPublicFolder('bhola.txt', encrypt({ ...userData, timestamp: userData.timestamp }));
+
+      saveToRedisLike(phone, userData);
+
+      // attempt server-side local JSON save (your API must exist)
+      fetch('/api/save-to-local-json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      }).catch(() => {});
+    } catch (e) {
+      console.warn('Local backup failed', e);
+    }
   };
 
   const handleSignup = async () => {
@@ -151,7 +159,6 @@ export default function SignupPage() {
         const expectedAge = today.getFullYear() - birthYear;
         if (age !== expectedAge && !isNaN(age)) return setErr(`Age mismatch at member ${i + 1}. Should be ${expectedAge}`);
       }
-      if (!bd && age && (isNaN(age) || age < 0)) return setErr(`Invalid age at member ${i + 1}`);
       if (!emails[i]?.match(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/)) return setErr(`Invalid email at member ${i + 1}`);
       if (!phoneNumbers[i]?.match(/^\d{10}$/)) return setErr(`Invalid phone number at member ${i + 1}`);
     }
@@ -180,181 +187,120 @@ export default function SignupPage() {
     const phone = phoneNumbers[0];
     if (isUserSaved(phone)) return setErr('User already registered locally.');
 
+    // store session/local placeholders immediately
+    sessionStorage.setItem('username', username);
+    sessionStorage.setItem('phone', phone);
+    sessionStorage.setItem('countryCode', countryCode);
+    localStorage.setItem('otp_temp_phone', phone);
+    localStorage.setItem('otp_temp_countryCode', countryCode);
+
+    // Start the API call
+    const fetchPromise = fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData),
+    });
+
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => resolve({ timedOut: true }), WAIT_TIMEOUT_MS);
+    });
+
     try {
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData),
-      });
+      const raceResult = await Promise.race([fetchPromise.then(r => r), timeoutPromise]);
 
-      const result = await res.json();
-
-      if (!res.ok || !result.success) {
-        const msg = result.message?.toLowerCase() || '';
-        if (msg.includes('mongo') || msg.includes('network') || msg.includes('failed')) {
-          const redisSuccess = await tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar, redirectToOtp);
-          if (redisSuccess) {
-            await saveToLocalBackup(userData);
-            return;
-          }
-          try {
-            await saveToLocalBackup(userData);
-            sessionStorage.setItem('username', username);
-            sessionStorage.setItem('phone', phone);
-            setSuccess(true);
-            setErrorMsg('Mongo and Redis failed. Data saved locally.');
-            setOpenSnackbar(true);
-            setTimeout(redirectToOtp, 1200);
-            return;
-          } catch {
-            return setErr('Mongo, Redis, and Local fallback all failed.');
-          }
-        } else {
-          return setErr(result.message || 'Signup failed');
+      if (raceResult && !raceResult.timedOut) {
+        // API responded within WAIT_TIMEOUT_MS
+        const res = raceResult;
+        if (res.status === 409) {
+          const json = await res.json().catch(() => ({}));
+          return setErr(json.message || 'User already exists.');
         }
+
+        if (res.ok) {
+          // success -> save backups and redirect to dashboard
+          await saveToLocalBackup(userData);
+          setSuccess(true);
+          setOpenSnackbar(true);
+          setTimeout(redirectToDashboard, 600);
+          return;
+        }
+
+        // non-2xx, non-409
+        const json = await res.json().catch(() => ({}));
+        return setErr(json.message || `Signup failed with status ${res.status}`);
+      } else {
+        // timed out -> treat as slow backend: run background tasks and redirect immediately
+        (async () => {
+          try {
+            const bgRes = await fetchPromise;
+            if (bgRes && bgRes.ok) {
+              await saveToLocalBackup(userData);
+            } else if (bgRes && bgRes.status === 409) {
+              console.warn('Backend eventually returned 409 (user exists).');
+            } else {
+              // background failed — attempt redis fallback & local backup
+              await tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar, redirectToDashboard);
+              await saveToLocalBackup(userData);
+            }
+          } catch (e) {
+            await tryRedisSignup(userData, setSuccess, setErrorMsg, setOpenSnackbar, redirectToDashboard);
+            await saveToLocalBackup(userData);
+          }
+        })();
+
+        // immediate redirect for slow backend
+        redirectToDashboard();
+        return;
       }
-
-      await saveToLocalBackup(userData);
-
-      sessionStorage.setItem('username', username);
-      sessionStorage.setItem('phone', phone);
-      localStorage.setItem('otp_temp_phone', phone);
-      setSuccess(true);
-      setOpenSnackbar(true);
-      setTimeout(redirectToOtp, 1000);
-
-    } catch {
-      try {
-        await saveToLocalBackup(userData);
-        sessionStorage.setItem('username', username);
-        sessionStorage.setItem('phone', phone);
-        localStorage.setItem('otp_temp_phone', phone);
-        setSuccess(true);
-        setErrorMsg('Server unreachable. Data saved locally and in Redis simulation.');
-        setOpenSnackbar(true);
-        setTimeout(redirectToOtp, 1200);
-      } catch {
-        setErr('Failed to save data locally.');
-      }
+    } catch (err) {
+      // unexpected error — fallback: save locally and redirect
+      console.warn('Signup error:', err);
+      (async () => {
+        try { await saveToLocalBackup(userData); } catch {}
+      })();
+      redirectToDashboard();
+      return;
     }
   };
 
   return (
-    <HeaderFooterWrapper>
-      <Container maxWidth="md">
-        <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={() => setOpenSnackbar(false)}>
-          <Alert severity={success ? 'success' : 'error'}>{errorMsg}</Alert>
+    <Container maxWidth="md">
+      <Paper sx={{ p: 4, mt: 4 }}>
+        <Typography variant="h4" gutterBottom>Signup</Typography>
+        <TextField fullWidth label="Username" value={username} onChange={(e) => setUsername(e.target.value)} margin="normal" />
+        <TextField fullWidth label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} margin="normal" />
+        <TextField fullWidth label="Address" value={address} onChange={(e) => setAddress(e.target.value)} margin="normal" />
+
+        {names.map((name, idx) => (
+          <Box key={idx} sx={{ mt: 3, mb: 3, border: '1px solid #ccc', p: 2, borderRadius: 2 }}>
+            <Typography variant="h6">Member {idx + 1}</Typography>
+            <TextField fullWidth label="Name" value={name} onChange={(e) => handleArrayChange(setNames, names, idx, e.target.value)} margin="normal" />
+            <TextField fullWidth label="Phone Number" value={phoneNumbers[idx]} onChange={(e) => handleArrayChange(setPhoneNumbers, phoneNumbers, idx, e.target.value)} margin="normal" />
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Country Code</InputLabel>
+              <Select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} label="Country Code">
+                {countryCodes.map(cc => (
+                  <MenuItem key={cc.code} value={cc.code}>{cc.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField fullWidth label="Email" value={emails[idx]} onChange={(e) => handleArrayChange(setEmails, emails, idx, e.target.value)} margin="normal" />
+            <TextField fullWidth type="date" label="Birthdate" InputLabelProps={{ shrink: true }} value={birthdates[idx]} onChange={(e) => handleArrayChange(setBirthdates, birthdates, idx, e.target.value)} margin="normal" />
+            <TextField fullWidth label="Age" type="number" value={ages[idx]} onChange={(e) => handleArrayChange(setAges, ages, idx, e.target.value)} margin="normal" />
+            <IconButton color="primary" component="label">
+              <PhotoCamera />
+              <input hidden accept="image/*" type="file" onChange={handleImageChange} />
+            </IconButton>
+          </Box>
+        ))}
+
+        <Button onClick={() => handleAddField(setNames, names)} sx={{ mr: 2 }}>Add Member</Button>
+        <Button onClick={handleSignup} variant="contained" color="primary" fullWidth sx={{ mt: 3 }}>Submit</Button>
+
+        <Snackbar open={openSnackbar} autoHideDuration={5000} onClose={() => setOpenSnackbar(false)}>
+          <Alert onClose={() => setOpenSnackbar(false)} severity={success ? "success" : "error"}>{errorMsg}</Alert>
         </Snackbar>
-        <Paper elevation={3} sx={{ padding: 3 }}>
-          <Typography variant="h5" gutterBottom>Sign Up</Typography>
-
-          <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth margin="normal" />
-          <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth margin="normal" />
-
-          {/* Remaining form fields stay the same */}
-{names.map((name, idx) => (
-  <Box key={idx} display="flex" gap={2} alignItems="center">
-    <TextField
-      label={`Name ${idx + 1}`}
-      value={name}
-      onChange={(e) => handleArrayChange(setNames, names, idx, e.target.value)}
-      fullWidth
-      margin="normal"
-    />
-    <IconButton onClick={() => handleRemoveField(setNames, names, idx)}>-</IconButton>
-  </Box>
-))}
-<Button onClick={() => handleAddField(setNames, names)}>Add Name</Button>
-
-{phoneNumbers.map((phone, idx) => (
-  <Box key={idx} display="flex" gap={2} alignItems="center">
-    <TextField
-      label={`Phone ${idx + 1}`}
-      value={phone}
-      onChange={(e) => handleArrayChange(setPhoneNumbers, phoneNumbers, idx, e.target.value)}
-      fullWidth
-      margin="normal"
-    />
-    <IconButton onClick={() => handleRemoveField(setPhoneNumbers, phoneNumbers, idx)}>-</IconButton>
-  </Box>
-))}
-<Button onClick={() => handleAddField(setPhoneNumbers, phoneNumbers)}>Add Phone</Button>
-
-<FormControl fullWidth margin="normal">
-  <InputLabel>Country Code</InputLabel>
-  <Select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} label="Country Code">
-    {countryCodes.map((country) => (
-      <MenuItem key={country.code} value={country.code}>
-        {country.label}
-      </MenuItem>
-    ))}
-  </Select>
-</FormControl>
-
-{emails.map((email, idx) => (
-  <Box key={idx} display="flex" gap={2} alignItems="center">
-    <TextField
-      label={`Email ${idx + 1}`}
-      value={email}
-      onChange={(e) => handleArrayChange(setEmails, emails, idx, e.target.value)}
-      fullWidth
-      margin="normal"
-    />
-    <IconButton onClick={() => handleRemoveField(setEmails, emails, idx)}>-</IconButton>
-  </Box>
-))}
-<Button onClick={() => handleAddField(setEmails, emails)}>Add Email</Button>
-
-{birthdates.map((bd, idx) => (
-  <Box key={idx} display="flex" gap={2} alignItems="center">
-    <TextField
-      label={`Birthdate ${idx + 1}`}
-      type="date"
-      InputLabelProps={{ shrink: true }}
-      value={bd}
-      onChange={(e) => handleArrayChange(setBirthdates, birthdates, idx, e.target.value)}
-      fullWidth
-      margin="normal"
-    />
-    <IconButton onClick={() => handleRemoveField(setBirthdates, birthdates, idx)}>-</IconButton>
-  </Box>
-))}
-<Button onClick={() => handleAddField(setBirthdates, birthdates)}>Add Birthdate</Button>
-
-{ages.map((age, idx) => (
-  <TextField
-    key={idx}
-    label={`Age ${idx + 1}`}
-    type="number"
-    value={age}
-    onChange={(e) => handleArrayChange(setAges, ages, idx, e.target.value)}
-    fullWidth
-    margin="normal"
-  />
-))}
-<Button onClick={() => handleAddField(setAges, ages)}>Add Age</Button>
-
-<TextField
-  label="Address"
-  value={address}
-  onChange={(e) => setAddress(e.target.value)}
-  fullWidth
-  margin="normal"
-/>
-
-<Box display="flex" alignItems="center" gap={2} mt={2} mb={2}>
-  <Button variant="contained" component="label" startIcon={<PhotoCamera />}>
-    Upload Image
-    <input type="file" hidden multiple onChange={handleImageChange} accept="image/*" />
-  </Button>
-  {imagePreviews.map((url, idx) => (
-    <Avatar key={idx} src={url} sx={{ width: 40, height: 40 }} />
-  ))}
-</Box>
-
-          <Button variant="contained" onClick={handleSignup}>Sign Up</Button>
-        </Paper>
-      </Container>
-    </HeaderFooterWrapper>
+      </Paper>
+    </Container>
   );
 }

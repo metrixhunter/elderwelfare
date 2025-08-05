@@ -2,62 +2,52 @@ import { NextResponse } from 'next/server';
 import { User } from '@/backend/models/User';
 import { dbConnect } from '@/backend/utils/dbConnect';
 import { createClient } from 'redis';
+import { saveUserToFirebase, getUserFromFirebase } from '@/backend/utils/firebaseSave.server';
+import { saveUserLocally, getUserFromLocal } from '@/backend/utils/localSave';
 
 // Save user in Redis
 async function saveUserInRedis(userObj) {
   const redisUrl = process.env.UPSTASH_REDIS_URL || process.env.REDIS_URL;
   if (!redisUrl) return;
+
   const client = createClient({ url: redisUrl });
   try {
     await client.connect();
-    const key = `user:${userObj.username}`;
-    await client.set(key, JSON.stringify(userObj));
-    await client.disconnect();
-  } catch {
-    try { await client.disconnect(); } catch {}
+    await client.set(`user:${userObj.username}`, JSON.stringify(userObj));
+  } catch (err) {
+    console.error('[Redis] Save error:', err.message);
+  } finally {
+    await client.disconnect().catch(() => {});
   }
 }
 
 // Find user in Redis
-async function findUserInRedis({ username }) {
+async function findUserInRedis(username) {
   const redisUrl = process.env.UPSTASH_REDIS_URL || process.env.REDIS_URL;
   if (!redisUrl) return null;
+
   const client = createClient({ url: redisUrl });
   try {
     await client.connect();
-    const key = `user:${username}`;
-    const userStr = await client.get(key);
-    await client.disconnect();
-    if (userStr) return JSON.parse(userStr);
-  } catch {
-    try { await client.disconnect(); } catch {}
+    const userStr = await client.get(`user:${username}`);
+    return userStr ? JSON.parse(userStr) : null;
+  } catch (err) {
+    console.error('[Redis] Find error:', err.message);
+    return null;
+  } finally {
+    await client.disconnect().catch(() => {});
   }
-  return null;
 }
-
-/*
-Expected body:
-{
-  username: "string",
-  password: "string",
-  address: "string",
-  members: [
-    {
-      name: "string",
-      phoneNumbers: [
-        { countryCode: "+91", number: "9876543210" }
-      ],
-      emails: ["test@example.com"],
-      birthdate: "YYYY-MM-DD",
-      age: number,
-      images: ["url1", "url2"]
-    }
-  ]
-}
-*/
 
 export async function POST(req) {
-  const { username, password, address, members } = await req.json();
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ success: false, message: 'Invalid JSON payload' }, { status: 400 });
+  }
+
+  const { username, password, address, members } = body;
 
   if (!username || !password || !address || !Array.isArray(members) || members.length === 0) {
     return NextResponse.json(
@@ -71,7 +61,6 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: 'Each member must have a name.' }, { status: 400 });
     }
 
-    // ✅ Validate phone numbers as array of { countryCode, number }
     if (
       !Array.isArray(member.phoneNumbers) ||
       member.phoneNumbers.some(
@@ -81,14 +70,7 @@ export async function POST(req) {
           !/^\d{6,12}$/.test(ph.number)
       )
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            'Each member must have valid phoneNumbers: { countryCode: "+91", number: "9876543210" }',
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: 'Invalid phoneNumbers.' }, { status: 400 });
     }
 
     if (!Array.isArray(member.emails) || member.emails.length === 0) {
@@ -96,11 +78,11 @@ export async function POST(req) {
     }
 
     if (!Array.isArray(member.images)) {
-      return NextResponse.json({ success: false, message: 'Each member must have an images array.' }, { status: 400 });
+      return NextResponse.json({ success: false, message: 'Images must be an array.' }, { status: 400 });
     }
 
     if (member.birthdate && isNaN(Date.parse(member.birthdate))) {
-      return NextResponse.json({ success: false, message: 'Invalid birthdate format (YYYY-MM-DD).' }, { status: 400 });
+      return NextResponse.json({ success: false, message: 'Invalid birthdate format.' }, { status: 400 });
     }
 
     if (member.age && typeof member.age !== 'number') {
@@ -108,43 +90,77 @@ export async function POST(req) {
     }
   }
 
-  // Check MongoDB
-  let mongoOk = false;
-  let existing = null;
-  try {
-    await dbConnect();
-    mongoOk = true;
-    existing = await User.findOne({ username });
-  } catch {}
-
-  if (mongoOk && existing) {
-    return NextResponse.json({ success: false, message: 'User already exists.', username }, { status: 409 });
-  }
-
-  // Check Redis fallback if Mongo down
-  if (!mongoOk) {
-    const redisUser = await findUserInRedis({ username });
-    if (redisUser) {
-      return NextResponse.json({ success: false, message: 'User already exists.', username }, { status: 409 });
-    }
-  }
-
   const userObj = {
     username,
-    password, // 🔐 Hash in production
+    password,
     address,
     linked: false,
     members,
     createdAt: new Date().toISOString(),
   };
 
-  if (mongoOk) {
-    try {
+  let exists = {
+    mongo: false,
+    redis: false,
+    firebase: false,
+    local: false,
+  };
+
+  let mongoConnected = false;
+
+  // Mongo check
+  try {
+    await dbConnect();
+    mongoConnected = true;
+    const found = await User.findOne({ username });
+    exists.mongo = !!found;
+  } catch (err) {
+    console.error('[MongoDB] Connection or Query Error:', err.message);
+  }
+
+  // Redis check
+  try {
+    const redisUser = await findUserInRedis(username);
+    exists.redis = !!redisUser;
+  } catch (err) {
+    console.error('[Redis] Check error:', err.message);
+  }
+
+  // Firebase check
+  try {
+    const firebaseUser = await getUserFromFirebase({ username });
+    exists.firebase = !!firebaseUser;
+  } catch (err) {
+    console.error('[Firebase] Check error:', err.message);
+  }
+
+  // Local check
+  try {
+    const localUser = await getUserFromLocal(username);
+    exists.local = !!localUser;
+  } catch (err) {
+    console.error('[Local] Check error:', err.message);
+  }
+
+  if (exists.mongo || exists.redis || exists.firebase || exists.local) {
+    return NextResponse.json({ success: false, message: 'User already exists.', username }, { status: 409 });
+  }
+
+  // Save logic
+  try {
+    if (mongoConnected) {
       const user = new User(userObj);
       await user.save();
-    } catch {}
-  } else {
-    await saveUserInRedis(userObj);
+    } else {
+      throw new Error('Mongo not connected');
+    }
+  } catch (err) {
+    console.error('[MongoDB] Save failed:', err.message);
+    await Promise.all([
+      saveUserInRedis(userObj),
+      saveUserToFirebase(userObj),
+      saveUserLocally(userObj)
+    ]);
   }
 
   return NextResponse.json({

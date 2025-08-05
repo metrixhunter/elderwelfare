@@ -22,21 +22,38 @@ export { redisClient };
 // --- Member Subschema ---
 const memberSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  phoneNumbers: [{ type: String, match: [/^\d{10}$/, 'Must be 10 digits'] }],
-  emails: [{ type: String }],
+
+  phoneNumbers: [
+    {
+      countryCode: {
+        type: String,
+        match: [/^\+\d{1,4}$/, 'Invalid country code'],
+        required: true,
+      },
+      number: {
+        type: String,
+        match: [/^\d{6,12}$/, 'Invalid phone number'],
+        required: true,
+      }
+    }
+  ],
+
+  emails: [{
+    type: String,
+    match: [/.+@.+\..+/, 'Invalid email address']
+  }],
+
   birthdate: { type: Date },
   age: { type: Number },
-  images: [{ type: String }], // URLs or base64 image strings (e.g., QR)
+  images: [{ type: String }], // URLs or base64 strings
 });
 
 // --- User Schema ---
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, trim: true, unique: true },
   password: { type: String, required: true }, // hashed password recommended
-
   address: { type: String },
   linked: { type: Boolean, default: false },
-
   members: {
     type: [memberSchema],
     required: true,
@@ -56,7 +73,12 @@ export function validateUserObject(obj) {
     obj.members.every(m =>
       typeof m?.name === 'string' &&
       Array.isArray(m?.phoneNumbers) &&
+      m.phoneNumbers.every(ph =>
+        typeof ph?.countryCode === 'string' &&
+        typeof ph?.number === 'string'
+      ) &&
       Array.isArray(m?.emails) &&
+      m.emails.every(e => typeof e === 'string') &&
       (typeof m.birthdate === 'string' || m.birthdate instanceof Date || m.birthdate === undefined) &&
       (typeof m.age === 'number' || m.age === undefined) &&
       Array.isArray(m?.images)
