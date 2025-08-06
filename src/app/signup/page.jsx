@@ -194,6 +194,10 @@ export default function SignupPage() {
     localStorage.setItem('otp_temp_phone', phone);
     localStorage.setItem('otp_temp_countryCode', countryCode);
 
+    // === NEW: Save locally immediately (non-blocking) so server-side files can read saved data ===
+    // This writes to localStorage and attempts server-side save via your /api/save-to-local-json endpoint.
+    saveToLocalBackup(userData).catch(() => { /* swallow errors */ });
+
     // Start the API call
     const fetchPromise = fetch('/api/auth/signup', {
       method: 'POST',
@@ -217,8 +221,7 @@ export default function SignupPage() {
         }
 
         if (res.ok) {
-          // success -> save backups and redirect to dashboard
-          await saveToLocalBackup(userData);
+          // success -> already saved locally; show success and redirect to dashboard
           setSuccess(true);
           setOpenSnackbar(true);
           setTimeout(redirectToDashboard, 600);

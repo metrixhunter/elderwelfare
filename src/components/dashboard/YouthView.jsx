@@ -1,22 +1,19 @@
+// src/components/dashboard/ElderView.jsx
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card } from '../ui/card'; // your UI card component
-import { Button } from '../ui/button'; // your UI button component
+import { Card } from '../ui/card'; // Your Card UI component
+import { Button } from '../ui/button'; // Your Button UI component
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import TextField from '@mui/material/TextField';
-import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-// Default QR placeholder image path (adjust if needed)
-const DEFAULT_QR_PLACEHOLDER = '/elderwelfare/default-qr-placeholder.png';
-
-// LocalStorage keys to scan for user data fallback (your signup files)
+// Your fallback user files keys
 const LOCAL_USER_FILES = ['chamcha.json', 'maja.txt', 'jhola.txt', 'bhola.txt'];
 
-// Utility: Load all users from localStorage fallback keys
+// Load all users from localStorage fallback keys
 function loadAllUsersFromLocalStorage() {
   const users = [];
   for (const key of LOCAL_USER_FILES) {
@@ -28,71 +25,96 @@ function loadAllUsersFromLocalStorage() {
         users.push(user);
       }
     } catch {
-      // ignore parse errors, maybe encrypted - skip for now
+      // Ignore parse errors
     }
   }
   return users;
 }
 
-export default function YouthView({ user }) {
+export default function ElderView({ user }) {
   const [elders, setElders] = useState([]);
-  const [helpStates, setHelpStates] = useState({}); // keyed by elder username
+  const [requestStates, setRequestStates] = useState({}); // keyed by elder username
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load users and filter elders (age >= 55)
-    const allUsers = loadAllUsersFromLocalStorage();
+    let mounted = true;
 
-    // Flatten members if needed, then filter elders
-    let eldersList = [];
-    allUsers.forEach((userObj) => {
-      if (!userObj.members) return;
-      userObj.members.forEach((member) => {
-        if (member.age >= 55) {
-          eldersList.push({
-            username: userObj.username,
-            phone: member.phoneNumbers?.[0] || '',
-            countryCode: member.countryCode || '+91',
-            email: member.emails?.[0] || '',
-            qrCodeImageUrl: member.images?.[0] || null,
-          });
+    async function init() {
+      try {
+        // Prefer server aggregated data
+        const infoRes = await fetch('/api/auth/informationloader');
+        let allUsers = [];
+        if (infoRes.ok) {
+          const infoJson = await infoRes.json().catch(() => null);
+          allUsers = (infoJson && Array.isArray(infoJson.users)) ? infoJson.users : [];
         }
-      });
-    });
 
-    // Sort elders alphabetically by username
-    eldersList.sort((a, b) => a.username.localeCompare(b.username));
+        // fallback to localStorage if server returned no users
+        if (!Array.isArray(allUsers) || allUsers.length === 0) {
+          allUsers = loadAllUsersFromLocalStorage();
+        }
 
-    setElders(eldersList);
+        // SWAPPED LOGIC: show members with age >= 55 (elders)
+        const eldersList = [];
+        allUsers.forEach((userObj) => {
+          if (!userObj.members) return;
+          userObj.members.forEach((member) => {
+            const age = (typeof member.age === 'number') ? member.age : (member.age ? Number(member.age) : null);
+            if (age !== null && !isNaN(age) && age >= 55) {
+              eldersList.push({
+                username: userObj.username,
+                phone: (member.phoneNumbers && member.phoneNumbers[0] && member.phoneNumbers[0].number) || '',
+                countryCode: (member.phoneNumbers && member.phoneNumbers[0] && member.phoneNumbers[0].countryCode) || '+91',
+                email: (member.emails && member.emails[0]) || '',
+                qrCodeImageUrl: (member.images && member.images[0]) || null,
+              });
+            }
+          });
+        });
 
-    // Initialize helpStates for elders if not existing
-    const initHelp = {};
-    eldersList.forEach(({ username }) => {
-      initHelp[username] = {
-        medicines: false,
-        medicalHelp: false,
-        money: false,
-        moneyAmount: '',
-        message: '',
-        showQr: false,
-      };
-    });
-    setHelpStates(initHelp);
+        eldersList.sort((a, b) => a.username.localeCompare(b.username));
+        if (!mounted) return;
+
+        setElders(eldersList);
+
+        // initialize request states
+        const initReq = {};
+        eldersList.forEach(({ username }) => {
+          initReq[username] = {
+            medicines: false,
+            medicalHelp: false,
+            money: false,
+            moneyAmount: '',
+            requestEmail: false,
+            requestPhone: false,
+            message: '',
+          };
+        });
+        setRequestStates(initReq);
+      } catch (err) {
+        console.error('[ElderView] init error:', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    init();
+    return () => { mounted = false; };
   }, []);
 
   const handleCheckboxChange = (elderUsername, field) => (e) => {
-    setHelpStates((prev) => ({
+    setRequestStates((prev) => ({
       ...prev,
       [elderUsername]: {
         ...prev[elderUsername],
         [field]: e.target.checked,
-        // Reset moneyAmount if money unchecked
         ...(field === 'money' && !e.target.checked ? { moneyAmount: '' } : {}),
       },
     }));
   };
 
   const handleInputChange = (elderUsername, field) => (e) => {
-    setHelpStates((prev) => ({
+    setRequestStates((prev) => ({
       ...prev,
       [elderUsername]: {
         ...prev[elderUsername],
@@ -101,42 +123,31 @@ export default function YouthView({ user }) {
     }));
   };
 
-  const handleToggleQr = (elderUsername) => {
-    setHelpStates((prev) => ({
-      ...prev,
-      [elderUsername]: {
-        ...prev[elderUsername],
-        showQr: !prev[elderUsername].showQr,
-      },
-    }));
-  };
-
-  // Save request to localStorage per elder (can be enhanced to your message system)
   const handleSendRequest = (elderUsername) => {
-    const help = helpStates[elderUsername];
-    if (!help) return alert('No help info available');
+    const req = requestStates[elderUsername];
+    if (!req) return alert('No request info available.');
 
-    // Validate money amount if money ticked
-    if (help.money && (!help.moneyAmount || isNaN(help.moneyAmount) || Number(help.moneyAmount) <= 0)) {
-      return alert('Please enter a valid positive amount for money help.');
+    if (req.money && (!req.moneyAmount || isNaN(req.moneyAmount) || Number(req.moneyAmount) <= 0)) {
+      return alert('Please enter a valid positive amount for money request.');
     }
 
-    // Construct request object
     const request = {
       fromUsername: user.username,
       toUsername: elderUsername,
-      help: {
-        medicines: help.medicines,
-        medicalHelp: help.medicalHelp,
-        money: help.money ? Number(help.moneyAmount) : 0,
-        message: help.message.trim(),
+      requestHelp: {
+        medicines: req.medicines,
+        medicalHelp: req.medicalHelp,
+        money: req.money ? Number(req.moneyAmount) : 0,
+        requestEmail: req.requestEmail,
+        requestPhone: req.requestPhone,
+        message: req.message.trim(),
         timestamp: new Date().toISOString(),
       },
-      confirmed: false, // elder will confirm later
+      confirmed: false,
     };
 
-    // Load existing requests from localStorage
-    const existingRaw = localStorage.getItem('helpRequests') || '{}';
+    // Save requests to localStorage (keyed by elderUsername)
+    const existingRaw = localStorage.getItem('requestsToYouth') || '{}';
     let existing;
     try {
       existing = JSON.parse(existingRaw);
@@ -144,106 +155,70 @@ export default function YouthView({ user }) {
       existing = {};
     }
 
-    // Append new request under elderUsername
     if (!existing[elderUsername]) existing[elderUsername] = [];
     existing[elderUsername].push(request);
+    localStorage.setItem('requestsToYouth', JSON.stringify(existing));
 
-    localStorage.setItem('helpRequests', JSON.stringify(existing));
-
-    alert('Help request sent! The elder user will confirm soon.');
+    alert('Request sent! The elder user will respond soon.');
 
     // Reset form for this elder
-    setHelpStates((prev) => ({
+    setRequestStates((prev) => ({
       ...prev,
       [elderUsername]: {
         medicines: false,
         medicalHelp: false,
         money: false,
         moneyAmount: '',
+        requestEmail: false,
+        requestPhone: false,
         message: '',
-        showQr: false,
       },
     }));
   };
 
-  if (elders.length === 0) {
-    return <Typography>No elder users found to offer help.</Typography>;
-  }
+  if (loading) return <Typography>Loading...</Typography>;
+  if (elders.length === 0) return <Typography>No elder users found to request help from.</Typography>;
 
   return (
     <div className="space-y-6">
       {elders.map((elder) => {
-        const help = helpStates[elder.username] || {};
+        const req = requestStates[elder.username] || {};
         return (
           <Card
             key={elder.username}
             className="bg-white shadow-lg rounded-xl p-4 flex flex-col md:flex-row gap-4"
             style={{ minWidth: '300px' }}
           >
-            <Box className="flex-shrink-0 flex flex-col items-center" style={{ width: '120px' }}>
-              <Typography variant="h6" component="div" sx={{ mb: 1 }}>
+            <Box sx={{ width: 140, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Typography variant="h6" sx={{ mb: 1 }}>
                 {elder.username}
               </Typography>
-
               <Typography variant="body2" color="textSecondary" noWrap>
                 {`${elder.countryCode} ${elder.phone}`}
               </Typography>
               <Typography variant="body2" color="textSecondary" noWrap>
                 {elder.email}
               </Typography>
-
-              <Button
-                onClick={() => handleToggleQr(elder.username)}
-                variant="outlined"
-                size="small"
-                sx={{ mt: 1 }}
-              >
-                {help.showQr ? 'Hide QR Code' : 'Show QR Code'}
-              </Button>
-
-              {help.showQr && (
-                <Avatar
-                  variant="square"
-                  src={elder.qrCodeImageUrl || DEFAULT_QR_PLACEHOLDER}
-                  alt={`${elder.username} QR Code`}
-                  sx={{ width: 120, height: 120, mt: 1 }}
-                />
-              )}
             </Box>
 
-            <Box className="flex-1 flex flex-col gap-2">
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={help.medicines || false}
-                    onChange={handleCheckboxChange(elder.username, 'medicines')}
-                  />
-                }
-                label="Offer Medicines"
+                control={<Checkbox checked={req.medicines || false} onChange={handleCheckboxChange(elder.username, 'medicines')} />}
+                label="Request Medicines"
               />
               <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={help.medicalHelp || false}
-                    onChange={handleCheckboxChange(elder.username, 'medicalHelp')}
-                  />
-                }
-                label="Offer Medical Help"
+                control={<Checkbox checked={req.medicalHelp || false} onChange={handleCheckboxChange(elder.username, 'medicalHelp')} />}
+                label="Request Medical Help"
               />
               <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={help.money || false}
-                    onChange={handleCheckboxChange(elder.username, 'money')}
-                  />
-                }
-                label="Offer Money"
+                control={<Checkbox checked={req.money || false} onChange={handleCheckboxChange(elder.username, 'money')} />}
+                label="Request Money"
               />
-              {help.money && (
+              {req.money && (
                 <TextField
                   label="Amount (₹)"
                   type="number"
-                  value={help.moneyAmount || ''}
+                  value={req.moneyAmount || ''}
                   onChange={handleInputChange(elder.username, 'moneyAmount')}
                   inputProps={{ min: 1 }}
                   size="small"
@@ -251,22 +226,26 @@ export default function YouthView({ user }) {
                 />
               )}
 
+              <FormControlLabel
+                control={<Checkbox checked={req.requestEmail || false} onChange={handleCheckboxChange(elder.username, 'requestEmail')} />}
+                label="Request Email"
+              />
+              <FormControlLabel
+                control={<Checkbox checked={req.requestPhone || false} onChange={handleCheckboxChange(elder.username, 'requestPhone')} />}
+                label="Request Phone Number"
+              />
+
               <TextField
                 label="Additional message"
                 multiline
                 rows={3}
-                value={help.message || ''}
+                value={req.message || ''}
                 onChange={handleInputChange(elder.username, 'message')}
                 placeholder="Write any special requests or notes here..."
                 fullWidth
               />
 
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => handleSendRequest(elder.username)}
-                sx={{ alignSelf: 'flex-start', mt: 1 }}
-              >
+              <Button variant="contained" color="primary" onClick={() => handleSendRequest(elder.username)} sx={{ alignSelf: 'flex-start', mt: 1 }}>
                 Confirm / Send Request
               </Button>
             </Box>
