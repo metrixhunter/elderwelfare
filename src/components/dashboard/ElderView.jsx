@@ -60,7 +60,7 @@ export default function ElderView({ user }) {
           if (!userObj.members) return;
           userObj.members.forEach((member) => {
             const age = (typeof member.age === 'number') ? member.age : (member.age ? Number(member.age) : null);
-            if (age !== null && !isNaN(age) && age >= 55) {
+            if (age !== null && !isNaN(age) && age <= 55) {
               eldersList.push({
                 username: userObj.username,
                 phone: (member.phoneNumbers && member.phoneNumbers[0] && member.phoneNumbers[0].number) || '',

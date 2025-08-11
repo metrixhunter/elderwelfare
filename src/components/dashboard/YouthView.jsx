@@ -204,15 +204,15 @@ export default function ElderView({ user }) {
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <FormControlLabel
                 control={<Checkbox checked={req.medicines || false} onChange={handleCheckboxChange(elder.username, 'medicines')} />}
-                label="Request Medicines"
+                label=" Medicines"
               />
               <FormControlLabel
                 control={<Checkbox checked={req.medicalHelp || false} onChange={handleCheckboxChange(elder.username, 'medicalHelp')} />}
-                label="Request Medical Help"
+                label="Give Medical Help"
               />
               <FormControlLabel
                 control={<Checkbox checked={req.money || false} onChange={handleCheckboxChange(elder.username, 'money')} />}
-                label="Request Money"
+                label="Donate Money"
               />
               {req.money && (
                 <TextField
