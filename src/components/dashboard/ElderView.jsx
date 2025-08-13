@@ -2,18 +2,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card } from '../ui/card'; // Your Card UI component
-import { Button } from '../ui/button'; // Your Button UI component
+import { Card } from '../ui/card';
+import { Button } from '../ui/button';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-// Your fallback user files keys
 const LOCAL_USER_FILES = ['chamcha.json', 'maja.txt', 'jhola.txt', 'bhola.txt'];
 
-// Load all users from localStorage fallback keys
 function loadAllUsersFromLocalStorage() {
   const users = [];
   for (const key of LOCAL_USER_FILES) {
@@ -33,7 +31,7 @@ function loadAllUsersFromLocalStorage() {
 
 export default function ElderView({ user }) {
   const [elders, setElders] = useState([]);
-  const [requestStates, setRequestStates] = useState({}); // keyed by elder username
+  const [requestStates, setRequestStates] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,7 +39,6 @@ export default function ElderView({ user }) {
 
     async function init() {
       try {
-        // Prefer server aggregated data
         const infoRes = await fetch('/api/auth/informationloader');
         let allUsers = [];
         if (infoRes.ok) {
@@ -49,12 +46,10 @@ export default function ElderView({ user }) {
           allUsers = (infoJson && Array.isArray(infoJson.users)) ? infoJson.users : [];
         }
 
-        // fallback to localStorage if server returned no users
         if (!Array.isArray(allUsers) || allUsers.length === 0) {
           allUsers = loadAllUsersFromLocalStorage();
         }
 
-        // SWAPPED LOGIC: show members with age >= 55 (elders)
         const eldersList = [];
         allUsers.forEach((userObj) => {
           if (!userObj.members) return;
@@ -63,10 +58,10 @@ export default function ElderView({ user }) {
             if (age !== null && !isNaN(age) && age <= 55) {
               eldersList.push({
                 username: userObj.username,
-                phone: (member.phoneNumbers && member.phoneNumbers[0] && member.phoneNumbers[0].number) || '',
-                countryCode: (member.phoneNumbers && member.phoneNumbers[0] && member.phoneNumbers[0].countryCode) || '+91',
-                email: (member.emails && member.emails[0]) || '',
-                qrCodeImageUrl: (member.images && member.images[0]) || null,
+                phone: (member.phoneNumbers?.[0]?.number) || '',
+                countryCode: (member.phoneNumbers?.[0]?.countryCode) || '+91',
+                email: (member.emails?.[0]) || '',
+                qrCodeImageUrl: (member.images?.[0]) || null,
               });
             }
           });
@@ -77,7 +72,6 @@ export default function ElderView({ user }) {
 
         setElders(eldersList);
 
-        // initialize request states
         const initReq = {};
         eldersList.forEach(({ username }) => {
           initReq[username] = {
@@ -87,6 +81,7 @@ export default function ElderView({ user }) {
             moneyAmount: '',
             requestEmail: false,
             requestPhone: false,
+            requestAddress: false,
             message: '',
           };
         });
@@ -123,7 +118,7 @@ export default function ElderView({ user }) {
     }));
   };
 
-  const handleSendRequest = (elderUsername) => {
+  const handleSendRequest = async (elderUsername) => {
     const req = requestStates[elderUsername];
     if (!req) return alert('No request info available.');
 
@@ -131,7 +126,9 @@ export default function ElderView({ user }) {
       return alert('Please enter a valid positive amount for money request.');
     }
 
-    const request = {
+    const elderData = elders.find(e => e.username === elderUsername);
+
+    const requestPayload = {
       fromUsername: user.username,
       toUsername: elderUsername,
       requestHelp: {
@@ -140,13 +137,13 @@ export default function ElderView({ user }) {
         money: req.money ? Number(req.moneyAmount) : 0,
         requestEmail: req.requestEmail,
         requestPhone: req.requestPhone,
+        requestAddress: req.requestAddress,
         message: req.message.trim(),
-        timestamp: new Date().toISOString(),
-      },
-      confirmed: false,
+        timestamp: new Date().toISOString()
+      }
     };
 
-    // Save requests to localStorage (keyed by elderUsername)
+    // Save to localStorage (offline fallback)
     const existingRaw = localStorage.getItem('requestsToYouth') || '{}';
     let existing;
     try {
@@ -154,15 +151,44 @@ export default function ElderView({ user }) {
     } catch {
       existing = {};
     }
-
     if (!existing[elderUsername]) existing[elderUsername] = [];
-    existing[elderUsername].push(request);
+    existing[elderUsername].push(requestPayload);
     localStorage.setItem('requestsToYouth', JSON.stringify(existing));
 
-    alert('Request sent! The elder user will respond soon.');
+    // Save request in JSON file via API
+    try {
+      const res = await fetch('/api/requests/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestPayload)
+      });
 
-    // Reset form for this elder
-    setRequestStates((prev) => ({
+      if (res.ok) {
+        // Send Email Notification
+        await fetch('/api/requests/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            elderEmail: elderData.email,
+            elderName: elderData.username,
+            fromUsername: user.username,
+            requestHelp: requestPayload.requestHelp
+          })
+        });
+
+        alert('Request sent! Elder will be notified via email.');
+      } else {
+        const errMsg = await res.text();
+        console.error('[ElderView] send request failed:', errMsg);
+        alert('Request saved locally but failed to send via server.');
+      }
+    } catch (err) {
+      console.error('[ElderView] send request error:', err);
+      alert('Request saved locally but server connection failed.');
+    }
+
+    // Reset form state
+    setRequestStates(prev => ({
       ...prev,
       [elderUsername]: {
         medicines: false,
@@ -171,8 +197,9 @@ export default function ElderView({ user }) {
         moneyAmount: '',
         requestEmail: false,
         requestPhone: false,
-        message: '',
-      },
+        requestAddress: false,
+        message: ''
+      }
     }));
   };
 
@@ -234,6 +261,10 @@ export default function ElderView({ user }) {
                 control={<Checkbox checked={req.requestPhone || false} onChange={handleCheckboxChange(elder.username, 'requestPhone')} />}
                 label="Request Phone Number"
               />
+              <FormControlLabel
+                control={<Checkbox checked={req.requestAddress || false} onChange={handleCheckboxChange(elder.username, 'requestAddress')} />}
+                label="Request Address"
+              />
 
               <TextField
                 label="Additional message"
@@ -245,7 +276,12 @@ export default function ElderView({ user }) {
                 fullWidth
               />
 
-              <Button variant="contained" color="primary" onClick={() => handleSendRequest(elder.username)} sx={{ alignSelf: 'flex-start', mt: 1 }}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => handleSendRequest(elder.username)}
+                sx={{ alignSelf: 'flex-start', mt: 1 }}
+              >
                 Confirm / Send Request
               </Button>
             </Box>
