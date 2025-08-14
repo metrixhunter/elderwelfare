@@ -1,21 +1,66 @@
 // File: src/app/api/requests/send-email/route.js
 import nodemailer from "nodemailer";
 
-// In-memory log (resets when server restarts)
-let emailLogs = [];
-
 export async function POST(req) {
-  const body = await req.json();
-  const { elderEmail, elderName, fromUsername, fromAge, requestHelp, recipientType } = body;
-
-  if (!elderEmail || !fromUsername || !requestHelp || !fromAge || !recipientType) {
-    return new Response(
-      JSON.stringify({ error: "Missing required fields" }),
-      { status: 400 }
-    );
-  }
-
   try {
+    const body = await req.json();
+    console.log("📩 Incoming send-email body:", body);
+
+    const {
+      elderEmail,
+      elderName,
+      fromUsername,
+      fromAge,
+      toAge,
+      requestHelp
+    } = body;
+
+    // ✅ Minimal required: an email + a sender name
+    if (!elderEmail?.trim() || !fromUsername?.trim()) {
+      return new Response(
+        JSON.stringify({
+          error: "Missing elderEmail or fromUsername",
+          received: body
+        }),
+        { status: 400 }
+      );
+    }
+
+    const senderIsElder = fromAge && toAge && fromAge >= 60 && toAge < 60;
+
+    let messageBody = "";
+    if (senderIsElder) {
+      messageBody = `
+Elder ${fromUsername} is requesting help.
+
+Medicines: ${requestHelp?.medicines ? "Yes" : "No"}
+Medical Help: ${requestHelp?.medicalHelp ? "Yes" : "No"}
+Money: ${requestHelp?.money > 0 ? `₹${requestHelp.money}` : "No"}
+
+Message:
+${requestHelp?.message || "(No message)"}
+
+Accept: https://yourwebsite.com/accept?from=${encodeURIComponent(fromUsername)}
+Decline: https://yourwebsite.com/decline?from=${encodeURIComponent(fromUsername)}
+      `;
+    } else {
+      messageBody = `
+Hello ${elderName || "Elder"},
+
+You have received a help offer from ${fromUsername}.
+
+Medicines: ${requestHelp?.medicines ? "Yes" : "No"}
+Medical Help: ${requestHelp?.medicalHelp ? "Yes" : "No"}
+Money: ${requestHelp?.money > 0 ? `₹${requestHelp.money}` : "No"}
+
+Message:
+${requestHelp?.message || "(No message)"}
+
+Accept: https://yourwebsite.com/accept?from=${encodeURIComponent(fromUsername)}
+Decline: https://yourwebsite.com/decline?from=${encodeURIComponent(fromUsername)}
+      `;
+    }
+
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -24,83 +69,23 @@ export async function POST(req) {
       },
     });
 
-    // Helper to generate Accept/Deny buttons
-    const actionButtons = `
-      <p>
-        <a href="https://yourdomain.com/accept?from=${encodeURIComponent(fromUsername)}" style="padding:10px 15px;background-color:green;color:white;text-decoration:none;border-radius:5px;">Accept</a>
-        <a href="https://yourdomain.com/deny?from=${encodeURIComponent(fromUsername)}" style="padding:10px 15px;background-color:red;color:white;text-decoration:none;border-radius:5px;">Deny</a>
-      </p>
-    `;
-
-    let subject, emailHtml;
-
-    if (fromAge < 60 && recipientType === "elder") {
-      // Youth sending to elder
-      subject = `Help Request from ${fromUsername}`;
-      emailHtml = `
-        <p>Hello ${elderName || "Elder"},</p>
-        <p>You have received a new help request from <strong>${fromUsername}</strong>.</p>
-        <ul>
-          <li>Medicines: ${requestHelp.medicines ? "Yes" : "No"}</li>
-          <li>Medical Help: ${requestHelp.medicalHelp ? "Yes" : "No"} (${requestHelp.medicalHelpSent ? "Sent" : "Not Sent"})</li>
-          <li>Money: ${requestHelp.money > 0 ? `₹${requestHelp.money}` : "No"} (${requestHelp.moneySent ? "Sent" : "Not Sent"})</li>
-          <li>Contact Email: ${requestHelp.requestEmail ? "Yes" : "No"}</li>
-          <li>Contact Phone: ${requestHelp.requestPhone ? "Yes" : "No"}</li>
-          <li>Contact Address: ${requestHelp.requestAddress ? "Yes" : "No"}</li>
-        </ul>
-        <p>Message: ${requestHelp.message || "(No additional message)"}</p>
-        ${actionButtons}
-        <p>Regards,<br>ElderCare Welfare Team</p>
-      `;
-    } else if (fromAge >= 60 && recipientType === "youth") {
-      // Elder sending to youth
-      subject = `Request from Elder ${fromUsername}`;
-      emailHtml = `
-        <p>Hello,</p>
-        <p>Elder <strong>${fromUsername}</strong> is requesting your assistance.</p>
-        <ul>
-          <li>Medicines: ${requestHelp.medicines ? "Yes" : "No"}</li>
-          <li>Medical Help: ${requestHelp.medicalHelp ? "Yes" : "No"} (${requestHelp.medicalHelpSent ? "Sent" : "Not Sent"})</li>
-          <li>Money: ${requestHelp.money > 0 ? `₹${requestHelp.money}` : "No"} (${requestHelp.moneySent ? "Sent" : "Not Sent"})</li>
-        </ul>
-        <p>Message: ${requestHelp.message || "(No additional message)"}</p>
-        ${actionButtons}
-        <p>Regards,<br>ElderCare Welfare Team</p>
-      `;
-    } else {
-      return new Response(
-        JSON.stringify({ error: "Invalid age/recipient type combination" }),
-        { status: 400 }
-      );
-    }
-
-    // Send email
     await transporter.sendMail({
       from: `"ElderCare Welfare" <${process.env.EMAIL_USER}>`,
       to: elderEmail,
-      subject,
-      html: emailHtml,
-    });
-
-    // Log in memory
-    emailLogs.push({
-      elderEmail,
-      elderName,
-      fromUsername,
-      fromAge,
-      requestHelp,
-      recipientType,
-      sentAt: new Date().toISOString(),
+      subject: senderIsElder
+        ? `Help Request from Elder ${fromUsername}`
+        : `Help Offer from ${fromUsername}`,
+      text: messageBody,
     });
 
     return new Response(
-      JSON.stringify({ success: true, message: "Email sent successfully" }),
+      JSON.stringify({ success: true, message: "Email sent" }),
       { status: 200 }
     );
   } catch (error) {
-    console.error("Email send error:", error);
+    console.error("❌ Email send error:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to send email", details: error.message }),
+      JSON.stringify({ error: "Email failed", details: error.message }),
       { status: 500 }
     );
   }
