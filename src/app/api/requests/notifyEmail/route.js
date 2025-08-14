@@ -1,16 +1,16 @@
-// /pages/api/requests/notifyEmail.js
+// File: src/app/api/requests/notifyEmail/route.js
 import nodemailer from "nodemailer";
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
+export async function POST(req) {
   try {
-    const { elderEmail, elderName, requestDetails } = req.body;
+    const body = await req.json(); // In App Router, we parse JSON from req
+    const { elderEmail, elderName, requestDetails } = body;
 
     if (!elderEmail) {
-      return res.status(400).json({ error: "Elder email is required" });
+      return new Response(
+        JSON.stringify({ error: "Elder email is required" }),
+        { status: 400 }
+      );
     }
 
     // Transporter setup (replace with your SMTP or Gmail credentials)
@@ -49,9 +49,12 @@ Please respond to them as soon as possible.
       text: emailText,
     });
 
-    return res.status(200).json({ success: true });
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
   } catch (error) {
     console.error("Email sending failed:", error);
-    return res.status(500).json({ error: "Email sending failed" });
+    return new Response(
+      JSON.stringify({ error: "Email sending failed" }),
+      { status: 500 }
+    );
   }
 }
