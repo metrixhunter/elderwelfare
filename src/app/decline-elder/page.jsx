@@ -1,73 +1,65 @@
 'use client';
-
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
 
-export default function DeclineElderPage() {
+function DeclineElderContent() {
   const searchParams = useSearchParams();
-  const from = searchParams.get('from');
+  const fromEmail = searchParams.get('from');
   const [elder, setElder] = useState(null);
-  const [status, setStatus] = useState('Loading elder info...');
 
-  async function loadUsers() {
-    try {
-      let users = JSON.parse(localStorage.getItem('users'));
-      if (!users) {
-        const res = await fetch('/api/informationloader');
-        if (!res.ok) throw new Error('Failed to fetch users');
-        users = await res.json();
-        localStorage.setItem('users', JSON.stringify(users));
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        let users = JSON.parse(localStorage.getItem('users'));
+        if (!users || !Array.isArray(users) || users.length === 0) {
+          const res = await fetch('/api/informationloader');
+          if (res.ok) {
+            users = await res.json();
+            localStorage.setItem('users', JSON.stringify(users));
+          }
+        }
+        const found = users?.find(u => u.email === fromEmail);
+        setElder(found || null);
+      } catch (err) {
+        console.error('Error loading elder:', err);
       }
-      const found = users.elders?.find(
-        (u) => u.email === from || u.id?.toString() === from
-      );
-      if (found) setElder(found);
-      else setStatus('Elder not found.');
-    } catch (err) {
-      console.error(err);
-      setStatus('Error loading elder info.');
     }
-  }
+    if (fromEmail) loadUser();
+  }, [fromEmail]);
 
-  async function handleDecline() {
-    if (!elder) return;
-    setStatus('Sending decline...');
+  const handleDecline = async () => {
     try {
-      const res = await fetch('/api/send-email', {
+      await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: elder.email,
+          to: elder?.email,
           subject: 'Elder Request Declined',
-          text: `Hello ${elder.name}, unfortunately your request has been declined.`,
-        }),
+          text: `Your request has been declined, ${elder?.name || 'Elder'}.`
+        })
       });
-      if (!res.ok) throw new Error('Failed to send email');
-      setStatus(`Elder declined and email sent to ${elder.email}`);
+      alert('Declined successfully!');
     } catch (err) {
-      console.error(err);
-      setStatus('Failed to send decline.');
+      console.error('Error sending decline email:', err);
     }
-  }
+  };
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
+  if (!elder) return <div>Loading elder info...</div>;
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Decline Elder</h1>
-      {elder ? (
-        <>
-          <p>
-            Decline request from <strong>{elder.name}</strong> (
-            {elder.email})
-          </p>
-          <button onClick={handleDecline}>Decline</button>
-        </>
-      ) : (
-        <p>{status}</p>
-      )}
+    <div style={{ padding: 20 }}>
+      <h1>Decline Elder Request</h1>
+      <p>Name: {elder.name}</p>
+      <p>Email: {elder.email}</p>
+      <button onClick={handleDecline}>Decline</button>
     </div>
+  );
+}
+
+export default function DeclineElderPage() {
+  return (
+    <Suspense fallback={<div>Loading page...</div>}>
+      <DeclineElderContent />
+    </Suspense>
   );
 }

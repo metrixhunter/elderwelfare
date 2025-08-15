@@ -1,76 +1,65 @@
 'use client';
-
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
 
-export default function AcceptElderPage() {
+function AcceptElderContent() {
   const searchParams = useSearchParams();
-  const from = searchParams.get('from');
+  const fromEmail = searchParams.get('from');
   const [elder, setElder] = useState(null);
-  const [status, setStatus] = useState('Loading elder info...');
 
-  async function loadUsers() {
-    try {
-      // 1️⃣ Try localStorage
-      let users = JSON.parse(localStorage.getItem('users'));
-      if (!users) {
-        // 2️⃣ If not in localStorage, fetch from API
-        const res = await fetch('/api/informationloader');
-        if (!res.ok) throw new Error('Failed to fetch users');
-        users = await res.json();
-        localStorage.setItem('users', JSON.stringify(users));
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        let users = JSON.parse(localStorage.getItem('users'));
+        if (!users || !Array.isArray(users) || users.length === 0) {
+          const res = await fetch('/api/informationloader');
+          if (res.ok) {
+            users = await res.json();
+            localStorage.setItem('users', JSON.stringify(users));
+          }
+        }
+        const found = users?.find(u => u.email === fromEmail);
+        setElder(found || null);
+      } catch (err) {
+        console.error('Error loading elder:', err);
       }
-      // 3️⃣ Find elder by email or id
-      const found = users.elders?.find(
-        (u) => u.email === from || u.id?.toString() === from
-      );
-      if (found) setElder(found);
-      else setStatus('Elder not found.');
-    } catch (err) {
-      console.error(err);
-      setStatus('Error loading elder info.');
     }
-  }
+    if (fromEmail) loadUser();
+  }, [fromEmail]);
 
-  async function handleAccept() {
-    if (!elder) return;
-    setStatus('Sending acceptance...');
+  const handleAccept = async () => {
     try {
-      const res = await fetch('/api/send-email', {
+      await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: elder.email,
+          to: elder?.email,
           subject: 'Elder Request Accepted',
-          text: `Hello ${elder.name}, your request has been accepted.`,
-        }),
+          text: `Your request has been accepted, ${elder?.name || 'Elder'}.`
+        })
       });
-      if (!res.ok) throw new Error('Failed to send email');
-      setStatus(`Elder accepted and email sent to ${elder.email}`);
+      alert('Accepted successfully!');
     } catch (err) {
-      console.error(err);
-      setStatus('Failed to send acceptance.');
+      console.error('Error sending accept email:', err);
     }
-  }
+  };
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
+  if (!elder) return <div>Loading elder info...</div>;
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Accept Elder</h1>
-      {elder ? (
-        <>
-          <p>
-            Accept request from <strong>{elder.name}</strong> (
-            {elder.email})
-          </p>
-          <button onClick={handleAccept}>Accept</button>
-        </>
-      ) : (
-        <p>{status}</p>
-      )}
+    <div style={{ padding: 20 }}>
+      <h1>Accept Elder Request</h1>
+      <p>Name: {elder.name}</p>
+      <p>Email: {elder.email}</p>
+      <button onClick={handleAccept}>Accept</button>
     </div>
+  );
+}
+
+export default function AcceptElderPage() {
+  return (
+    <Suspense fallback={<div>Loading page...</div>}>
+      <AcceptElderContent />
+    </Suspense>
   );
 }
