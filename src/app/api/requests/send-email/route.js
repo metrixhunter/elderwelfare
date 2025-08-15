@@ -28,6 +28,13 @@ export async function POST(req) {
 
     const senderIsElder = fromAge && toAge && fromAge >= 60 && toAge < 60;
 
+    // ✅ Inserted code for dynamic links
+    const baseUrl = "https://helpforcharity.netlify.app";
+    const acceptPath = senderIsElder ? "/accept-elder" : "/accept-youth";
+    const declinePath = senderIsElder ? "/decline-elder" : "/decline-youth";
+    const acceptLink = `${baseUrl}${acceptPath}?from=${encodeURIComponent(fromUsername)}`;
+    const declineLink = `${baseUrl}${declinePath}?from=${encodeURIComponent(fromUsername)}`;
+
     let messageBody = "";
     if (senderIsElder) {
       messageBody = `
@@ -40,8 +47,8 @@ Money: ${requestHelp?.money > 0 ? `₹${requestHelp.money}` : "No"}
 Message:
 ${requestHelp?.message || "(No message)"}
 
-Accept: https://yourwebsite.com/accept?from=${encodeURIComponent(fromUsername)}
-Decline: https://yourwebsite.com/decline?from=${encodeURIComponent(fromUsername)}
+Accept: ${acceptLink}
+Decline: ${declineLink}
       `;
     } else {
       messageBody = `
@@ -56,8 +63,8 @@ Money: ${requestHelp?.money > 0 ? `₹${requestHelp.money}` : "No"}
 Message:
 ${requestHelp?.message || "(No message)"}
 
-Accept: https://yourwebsite.com/accept?from=${encodeURIComponent(fromUsername)}
-Decline: https://yourwebsite.com/decline?from=${encodeURIComponent(fromUsername)}
+Accept: ${acceptLink}
+Decline: ${declineLink}
       `;
     }
 
