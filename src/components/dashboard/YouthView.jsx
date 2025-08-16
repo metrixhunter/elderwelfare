@@ -153,6 +153,7 @@ export default function YouthView({ user }) {
     });
 
     alert('Request sent! Elder will be notified via email.');
+
     setRequestStates(prev => ({
       ...prev,
       [elderUsername]: {
@@ -169,6 +170,13 @@ export default function YouthView({ user }) {
   } else {
     alert('Failed to send request.');
   }
+  // Save request to shared JSON file
+await fetch('/api/requests/save', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(requestPayload)
+});
+
 };
 
 

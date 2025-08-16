@@ -187,6 +187,14 @@ export default function ElderView({ user }) {
       alert('Request saved locally but server connection failed.');
     }
 
+    // Save request to shared JSON file
+await fetch('/api/requests/save', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(requestPayload)
+});
+
+
     // Reset form state
     setRequestStates(prev => ({
       ...prev,

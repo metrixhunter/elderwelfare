@@ -11,13 +11,16 @@ function DeclineYouthContent() {
     async function loadUser() {
       try {
         let users = JSON.parse(localStorage.getItem('users'));
+
         if (!users || !Array.isArray(users) || users.length === 0) {
-          const res = await fetch('/api/informationloader');
+          const res = await fetch('/api/requestsloader');
           if (res.ok) {
-            users = await res.json();
+            const data = await res.json();
+            users = Array.isArray(data) ? data : data.users || [];
             localStorage.setItem('users', JSON.stringify(users));
           }
         }
+
         const found = users?.find(u => u.email === fromEmail);
         setYouth(found || null);
       } catch (err) {
@@ -38,9 +41,17 @@ function DeclineYouthContent() {
           text: `Your request has been declined, ${youth?.name || 'Youth'}.`
         })
       });
-      alert('Declined successfully!');
+
+      await fetch('/api/requests/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: youth?.email })
+      });
+
+      alert('Declined and removed request successfully!');
+      setYouth(null);
     } catch (err) {
-      console.error('Error sending decline email:', err);
+      console.error('Error in decline flow:', err);
     }
   };
 
