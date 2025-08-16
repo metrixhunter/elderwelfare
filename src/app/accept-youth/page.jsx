@@ -4,56 +4,74 @@ import { useSearchParams } from 'next/navigation';
 
 function AcceptYouthContent() {
   const searchParams = useSearchParams();
-  const fromParam = searchParams.get('from'); // e.g. "hai" or "hai@gmail.com"
+  const fromParam = searchParams.get('from'); // could be username or email
   const [youth, setYouth] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadUser() {
       try {
-        let users = null;
-
-        // Try localStorage first
+        // Step 1: Load all requests
+        let requests = [];
         try {
-          users = JSON.parse(localStorage.getItem('users'));
+          requests = JSON.parse(localStorage.getItem('users')) || [];
         } catch {
-          users = null;
+          requests = [];
         }
 
-        // If localStorage empty → load from API
-        if (!Array.isArray(users) || users.length === 0) {
+        if (!Array.isArray(requests) || requests.length === 0) {
           const res = await fetch('/api/requestsloader');
           if (res.ok) {
             const data = await res.json();
-            users = Array.isArray(data.requests) ? data.requests : [];
-            localStorage.setItem('users', JSON.stringify(users));
-          } else {
-            users = [];
+            requests = Array.isArray(data.requests) ? data.requests : [];
+            localStorage.setItem('users', JSON.stringify(requests));
           }
         }
 
-        if (!Array.isArray(users)) users = [];
+        // Step 2: Load informationloader (for all user emails)
+        let infoUsers = [];
+        try {
+          const infoRes = await fetch('/api/auth/informationloader');
+          if (infoRes.ok) {
+            const infoJson = await infoRes.json().catch(() => null);
+            infoUsers = Array.isArray(infoJson?.users) ? infoJson.users : [];
+          }
+        } catch {}
+        
+        // fallback if info empty
+        if (!Array.isArray(infoUsers)) infoUsers = [];
 
-        // 🔥 Flexible matching:
-        // - Exact email match
-        // - Or username match before "@"
-        const matches = users.filter((u) => {
-          if (!u.email) return false;
-          if (u.email === fromParam) return true;
-          if (u.email.split('@')[0] === fromParam) return true;
-          return false;
-        });
-
-        console.log('[ACCEPT-YOUTH] param =', fromParam, 'matches =', matches);
-
-        // Pick latest by timestamp
+        // Step 3: Try to find matching request
         let found = null;
-        if (matches.length > 0) {
-          found = matches.reduce((latest, current) =>
-            (current.timestamp || 0) > (latest.timestamp || 0)
-              ? current
-              : latest
-          );
+
+        for (const req of requests) {
+          if (!req.username) continue;
+
+          // find same username in info loader
+          const matchedUser = infoUsers.find(u => u.username === req.username);
+          if (!matchedUser) continue;
+
+          // collect all possible emails for this user
+          const allEmails = [];
+          matchedUser.members?.forEach(member => {
+            if (Array.isArray(member.emails)) {
+              allEmails.push(...member.emails);
+            } else if (member.email) {
+              allEmails.push(member.email);
+            }
+          });
+
+          // check if fromParam matches username or any email
+          if (
+            req.username === fromParam ||
+            allEmails.includes(fromParam) ||
+            allEmails.some(e => e.split('@')[0] === fromParam)
+          ) {
+            // pick latest request if multiple
+            if (!found || (req.timestamp || 0) > (found.timestamp || 0)) {
+              found = { ...req, emails: allEmails };
+            }
+          }
         }
 
         setYouth(found || null);
@@ -68,44 +86,16 @@ function AcceptYouthContent() {
     loadUser();
   }, [fromParam]);
 
-  const handleAccept = async () => {
-    if (!youth) return;
-
-    try {
-      // Step 1: send email
-      await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: youth.email,
-          subject: 'Youth Request Accepted',
-          text: `Your request has been accepted, ${youth.name || 'Youth'}.`
-        })
-      });
-
-      // Step 2: remove request
-      await fetch('/api/requests/remove', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: youth.email })
-      });
-
-      alert('Accepted and removed request successfully!');
-      setYouth(null);
-    } catch (err) {
-      console.error('Error in accept flow:', err);
-    }
-  };
-
+  // for now, just show matching success
   if (loading) return <div>Loading youth info...</div>;
   if (!youth) return <div>No matching youth found for "{fromParam}".</div>;
 
   return (
     <div style={{ padding: 20 }}>
-      <h1>Accept Youth Request</h1>
+      <h1>✅ Found Youth Request</h1>
       <p><b>Name:</b> {youth.name}</p>
-      <p><b>Email:</b> {youth.email}</p>
-      <button onClick={handleAccept}>Accept</button>
+      <p><b>Username:</b> {youth.username}</p>
+      <p><b>Emails:</b> {youth.emails?.join(', ') || '(none)'}</p>
     </div>
   );
 }
