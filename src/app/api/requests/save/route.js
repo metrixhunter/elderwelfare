@@ -1,7 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import firebaseSave from '@/utils/firebaseSave.server'; // ✅ use your firebase util
 
 const REQUESTS_FILE = path.join(process.cwd(), 'data', 'requests.json');
 
@@ -40,9 +39,6 @@ export async function POST(req) {
       const requests = await readRequests();
       requests.push(newRequest);
       await writeRequests(requests);
-    } else {
-      // Prod: save to Firebase (or Mongo)
-      await firebaseSave('requests', newRequest);
     }
 
     return new Response(JSON.stringify(newRequest), { status: 200 });
@@ -61,10 +57,9 @@ export async function GET() {
         { status: 200 }
       );
     } else {
-      // Prod: fetch from Firebase
-      // Example: if firebaseSave also has "get" helper
+      // Prod: no-op / empty
       return new Response(
-        JSON.stringify({ success: true, requests: [] }), // TODO: fetch from Firebase
+        JSON.stringify({ success: true, requests: [] }),
         { status: 200 }
       );
     }
