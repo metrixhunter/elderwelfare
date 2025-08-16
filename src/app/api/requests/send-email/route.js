@@ -29,7 +29,7 @@ export async function POST(req) {
     const senderIsElder = fromAge && toAge && fromAge >= 60 && toAge < 60;
 
     // ✅ Inserted code for dynamic links
-    const baseUrl = "https://helpforcharity.netlify.app";
+    const baseUrl = "http://localhost:3000";
     const acceptPath = senderIsElder ? "/accept-elder" : "/accept-youth";
     const declinePath = senderIsElder ? "/decline-elder" : "/decline-youth";
     const acceptLink = `${baseUrl}${acceptPath}?from=${encodeURIComponent(fromUsername)}`;
