@@ -1,4 +1,3 @@
-// src/app/api/requestsloader/route.js
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -28,6 +27,7 @@ async function readRequests() {
 export async function GET() {
   try {
     const requests = await readRequests();
+
     return new Response(
       JSON.stringify({ success: true, count: requests.length, requests }),
       { status: 200 }

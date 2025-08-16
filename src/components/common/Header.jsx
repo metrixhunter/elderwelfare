@@ -3,7 +3,14 @@ export default function Header({ role, onLogout, user }) {
     <header className="flex justify-between items-center p-4 bg-blue-600 text-white">
       <div>{role === 'elder' ? 'Elder Dashboard' : 'Youth Dashboard'}</div>
       <div>
-        <span className="mr-4">{user?.username || 'User'}</span>
+        <span className="mr-4">
+  {user?.username || 'User'}
+  {user?.emails?.length > 0 && (
+    <span className="ml-2 text-gray-500 text-sm">
+      ({user.emails.join(', ')})
+    </span>
+  )}
+</span>
         <button onClick={onLogout} className="underline hover:text-gray-300">
           Logout
         </button>

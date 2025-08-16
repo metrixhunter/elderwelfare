@@ -4,62 +4,82 @@ import { useSearchParams } from 'next/navigation';
 
 function AcceptYouthContent() {
   const searchParams = useSearchParams();
-  const fromEmail = searchParams.get('from');
+  const fromParam = searchParams.get('from'); // e.g. "hai" or "hai@gmail.com"
   const [youth, setYouth] = useState(null);
   const [loading, setLoading] = useState(true);
 
- useEffect(() => {
-  async function loadUser() {
-    try {
-      let users = null;
-
-      // Try to read from localStorage safely
+  useEffect(() => {
+    async function loadUser() {
       try {
-        users = JSON.parse(localStorage.getItem('users'));
-      } catch {
-        users = null;
-      }
+        let users = null;
 
-      // If nothing valid in localStorage, load from API
-      if (!Array.isArray(users) || users.length === 0) {
-        const res = await fetch('/api/requestsloader');
-        if (res.ok) {
-          const data = await res.json();
-          users = Array.isArray(data.users) ? data.users : [];
-          localStorage.setItem('users', JSON.stringify(users));
-        } else {
-          users = [];
+        // Try localStorage first
+        try {
+          users = JSON.parse(localStorage.getItem('users'));
+        } catch {
+          users = null;
         }
+
+        // If localStorage empty → load from API
+        if (!Array.isArray(users) || users.length === 0) {
+          const res = await fetch('/api/requestsloader');
+          if (res.ok) {
+            const data = await res.json();
+            users = Array.isArray(data.requests) ? data.requests : [];
+            localStorage.setItem('users', JSON.stringify(users));
+          } else {
+            users = [];
+          }
+        }
+
+        if (!Array.isArray(users)) users = [];
+
+        // 🔥 Flexible matching:
+        // - Exact email match
+        // - Or username match before "@"
+        const matches = users.filter((u) => {
+          if (!u.email) return false;
+          if (u.email === fromParam) return true;
+          if (u.email.split('@')[0] === fromParam) return true;
+          return false;
+        });
+
+        console.log('[ACCEPT-YOUTH] param =', fromParam, 'matches =', matches);
+
+        // Pick latest by timestamp
+        let found = null;
+        if (matches.length > 0) {
+          found = matches.reduce((latest, current) =>
+            (current.timestamp || 0) > (latest.timestamp || 0)
+              ? current
+              : latest
+          );
+        }
+
+        setYouth(found || null);
+      } catch (err) {
+        console.error('Error loading user:', err);
+        setYouth(null);
+      } finally {
+        setLoading(false);
       }
-
-      // Still make sure it’s an array
-      if (!Array.isArray(users)) users = [];
-
-      // Find by email
-      const found = users.find((u) => u.email === fromEmail);
-      setYouth(found || null);
-    } catch (err) {
-      console.error('Error loading user:', err);
-      setYouth(null);
-    } finally {
-      setLoading(false);
     }
-  }
 
-  loadUser();
-}, [fromEmail]);
-
+    loadUser();
+  }, [fromParam]);
 
   const handleAccept = async () => {
+    if (!youth) return;
+
     try {
       // Step 1: send email
       await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: youth?.email,
+          to: youth.email,
           subject: 'Youth Request Accepted',
-          text: `Your request has been accepted, ${youth?.name || 'Youth'}.`
+          text: `Your request has been accepted, ${youth.name || 'Youth'}.`
         })
       });
 
@@ -67,7 +87,7 @@ function AcceptYouthContent() {
       await fetch('/api/requests/remove', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: youth?.email })
+        body: JSON.stringify({ email: youth.email })
       });
 
       alert('Accepted and removed request successfully!');
@@ -78,13 +98,13 @@ function AcceptYouthContent() {
   };
 
   if (loading) return <div>Loading youth info...</div>;
-  if (!youth) return <div>No matching youth found.</div>;
+  if (!youth) return <div>No matching youth found for "{fromParam}".</div>;
 
   return (
     <div style={{ padding: 20 }}>
       <h1>Accept Youth Request</h1>
-      <p>Name: {youth.name}</p>
-      <p>Email: {youth.email}</p>
+      <p><b>Name:</b> {youth.name}</p>
+      <p><b>Email:</b> {youth.email}</p>
       <button onClick={handleAccept}>Accept</button>
     </div>
   );

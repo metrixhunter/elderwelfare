@@ -127,21 +127,27 @@ export default function ElderView({ user }) {
     }
 
     const elderData = elders.find(e => e.username === elderUsername);
+const requestPayload = {
+  fromUsername: user.username,
+  toUsername: elderUsername,
+  fromEmails: Array.isArray(user.emails)
+    ? user.emails
+    : [user.email].filter(Boolean),   // youth’s emails
+  toEmails: Array.isArray(elderData.emails)
+    ? elderData.emails
+    : [elderData.email].filter(Boolean), // elder’s emails
+  requestHelp: {
+    medicines: req.medicines,
+    medicalHelp: req.medicalHelp,
+    money: req.money ? Number(req.moneyAmount) : 0,
+    requestEmail: req.requestEmail,
+    requestPhone: req.requestPhone,
+    requestAddress: req.requestAddress,
+    message: req.message.trim(),
+    timestamp: new Date().toISOString()
+  }
+};
 
-    const requestPayload = {
-      fromUsername: user.username,
-      toUsername: elderUsername,
-      requestHelp: {
-        medicines: req.medicines,
-        medicalHelp: req.medicalHelp,
-        money: req.money ? Number(req.moneyAmount) : 0,
-        requestEmail: req.requestEmail,
-        requestPhone: req.requestPhone,
-        requestAddress: req.requestAddress,
-        message: req.message.trim(),
-        timestamp: new Date().toISOString()
-      }
-    };
 
     // Save to localStorage (offline fallback)
     const existingRaw = localStorage.getItem('requestsToYouth') || '{}';
